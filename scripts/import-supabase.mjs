@@ -51,7 +51,12 @@ if (cmd === 'check') {
     const p = f.properties;
     const code = [p.ISO_A2_EH, p.ISO_A2, p.iso_a2].find((x) => x && x !== '-99');
     if (!ALLOWED.includes(code)) continue;
-    await rpc('import_country', { p_code: code, p_name: p.NAME_DE ?? p.NAME ?? code, p_geom: f.geometry });
+    const { error } = await sb.rpc('import_country', { p_code: code, p_name: p.NAME_DE ?? p.NAME ?? code, p_geom: f.geometry });
+    if (error && /Arbeitsbereich/.test(error.message)) {
+      console.log(`::warning::Land ${code} übersprungen: Die Datenbank kennt es noch nicht. Führe supabase/import-functions.sql im SQL-Editor erneut aus und starte den Import noch einmal.`);
+      continue;
+    }
+    if (error) await rpc('import_country', { p_code: code, p_name: p.NAME_DE ?? p.NAME ?? code, p_geom: f.geometry });
     console.log(`Land ${code} gespeichert`);
     n++;
   }

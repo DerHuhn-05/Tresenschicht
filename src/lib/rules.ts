@@ -9,5 +9,5 @@ export const MIN_AGE = 18; // A5
 export const PHOTO_MAX_SIDE = 1600; // G3
 export const PHOTO_TARGET_BYTES = 300_000;
 
-// B4: Deutschland und die neun Nachbarländer (ISO 3166-1 alpha-2)
-export const ALLOWED_COUNTRIES = ['DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL'];
+// B4: Deutschland, die neun Nachbarländer und Italien (ISO 3166-1 alpha-2)
+export const ALLOWED_COUNTRIES = ['DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL', 'IT'];

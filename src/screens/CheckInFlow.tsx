@@ -41,7 +41,7 @@ const REFUSAL_TEXT: Record<CheckInRefusal, string> = {
   lock: 'Du hast gerade erst eingecheckt. Der nächste Check-in ist nach 5 Minuten möglich.',
   same_pub: 'In dieser Kneipe warst du in den letzten 12 Stunden schon. Ein neuer Besuch zählt danach.',
   accuracy: 'Dein Standort ist gerade zu ungenau. Geh kurz ans Fenster oder vor die Tür und versuch es noch einmal.',
-  country: 'Check-ins gehen nur in Deutschland und seinen Nachbarländern.',
+  country: 'Check-ins gehen nur in Deutschland, seinen Nachbarländern und Italien.',
   too_far: 'Du bist zu weit von der Kneipe entfernt. Geh näher heran und versuch es noch einmal.',
   not_logged_in: 'Melde dich an, um einzuchecken.',
 };

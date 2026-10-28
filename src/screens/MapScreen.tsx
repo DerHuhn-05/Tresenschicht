@@ -153,7 +153,7 @@ export function MapScreen() {
             </button>
           </Notice>
         )}
-        {hint === 'area' && <Notice>Check-ins gehen nur in Deutschland und seinen Nachbarländern. Die Karte kannst du überall ansehen.</Notice>}
+        {hint === 'area' && <Notice>Check-ins gehen nur in Deutschland, seinen Nachbarländern und Italien. Die Karte kannst du überall ansehen.</Notice>}
         {(location.status === 'denied' || location.status === 'unavailable') && !location.simulated && (
           <Notice icon="location-off">
             Kein Standort. Öffne die Einstellungen und erlaube den Zugriff, während die App geöffnet ist.{' '}

@@ -10,7 +10,7 @@ language sql stable as $$ select now() $$;
 create or replace function public.import_country(p_code text, p_name text, p_geom jsonb) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 begin
-  if p_code not in ('DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL') then
+  if p_code not in ('DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL', 'IT') then
     raise exception 'Land % gehört nicht zum Arbeitsbereich.', p_code;
   end if;
   insert into countries (code, name, geom)

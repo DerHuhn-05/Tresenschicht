@@ -8,7 +8,7 @@ on:
     inputs:
       regionen:
         description: 'Geofabrik-Regionen (Europa), durch Leerzeichen getrennt. Zum Testen z. B. nur: germany'
-        default: 'germany austria switzerland france belgium netherlands luxembourg denmark poland czech-republic'
+        default: 'germany austria switzerland france belgium netherlands luxembourg denmark poland czech-republic italy'
         required: true
   schedule:
     - cron: '23 3 1 * *' # am 1. jedes Monats aktualisieren
@@ -16,11 +16,11 @@ concurrency: import-osm
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 240
     env:
       SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      REGIONEN: ${{ inputs.regionen || 'germany austria switzerland france belgium netherlands luxembourg denmark poland czech-republic' }}
+      REGIONEN: ${{ inputs.regionen || 'germany austria switzerland france belgium netherlands luxembourg denmark poland czech-republic italy' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

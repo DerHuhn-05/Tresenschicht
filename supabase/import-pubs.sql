@@ -22,7 +22,7 @@ on conflict (osm_id) do update set
   updated_at = now()
 where pubs.source = 'osm';
 
--- B4: Land bestimmen; was außerhalb von Deutschland und den Nachbarländern liegt, fliegt raus
+-- B4: Land bestimmen; was außerhalb von dem Arbeitsbereich liegt, fliegt raus
 update public.pubs p set country = c.code
 from public.countries c
 where p.source = 'osm' and st_contains(c.geom, st_setsrid(st_makepoint(p.lon, p.lat), 4326)) and p.country is distinct from c.code;

@@ -1,23 +1,49 @@
-import type { StyleSpecification } from 'maplibre-gl';
+import type { ExpressionSpecification, StyleSpecification } from 'maplibre-gl';
 import { tokenColor, type Theme } from '../lib/theme';
 
 const TILES = (import.meta.env.VITE_TILES_URL as string) || 'https://tiles.openfreemap.org/planet';
 const GLYPHS = (import.meta.env.VITE_GLYPHS_URL as string) || 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
 
 /**
- * C6: Kartenskin in den Markenfarben. Ruhige Flächen in Nachtblau-Tönen, Straßen hell,
- * Hauptstraßen mit Bernstein-Hauch. Keine Verläufe, keine Schatten. Schema: OpenMapTiles.
+ * C6: Kartenskin in den Markenfarben, bewusst reduziert. Die Karte ist Bühne für die Pins:
+ * zwei, drei Flächentöne, Straßen als feine Linien ohne Rand, kaum Beschriftung, keine POIs,
+ * keine Verläufe, keine Schatten. Hell: Nachtblau auf fast Weiß. Dunkel: Nachtkarte mit
+ * Bernstein-Hauptstraßen wie Straßenlaternen. Schema: OpenMapTiles.
  */
 export function brandStyle(theme: Theme): StyleSpecification {
   const dark = theme === 'dark';
   const c = (n: string) => tokenColor(n, dark ? 'dark' : 'light');
+
   const pal = dark
-    ? { land: c('navy-950'), water: c('navy-800'), park: '#06083A', building: c('navy-900'), road: c('navy-700'), major: c('navy-600'), casing: c('navy-950'), label: c('gray-300'), halo: c('navy-950'), rail: c('navy-700') }
-    : { land: c('navy-50'), water: c('navy-200'), park: '#E4E9EE', building: c('gray-100'), road: c('white'), major: c('amber-100'), casing: c('gray-200'), label: c('gray-600'), halo: c('white'), rail: c('gray-200') };
-  if (theme === 'contrast') Object.assign(pal, { land: c('white'), water: c('navy-200'), casing: c('gray-500'), label: c('gray-700'), building: c('gray-200') });
+    ? {
+        land: c('navy-950'),
+        green: '#03052C', // kaum sichtbar dunkler Hauch
+        water: c('navy-800'),
+        building: c('navy-900'),
+        minor: c('navy-700'),
+        major: c('amber-500'),
+        majorOpacity: 0.55,
+        label: c('navy-300'),
+        halo: c('navy-950'),
+        border: c('navy-600'),
+      }
+    : {
+        land: c('navy-50'),
+        green: '#EAEDF3',
+        water: c('navy-200'),
+        building: c('navy-100'),
+        minor: c('white'),
+        major: c('navy-200'),
+        majorOpacity: 1,
+        label: c('navy-500'),
+        halo: c('navy-50'),
+        border: c('navy-400'),
+      };
+  if (theme === 'contrast') Object.assign(pal, { land: c('white'), minor: c('gray-200'), major: c('navy-400'), label: c('navy-900'), halo: c('white'), building: c('gray-100') });
 
   const font = ['Noto Sans Regular'];
-  const roadWidth = (base: number): any => ['interpolate', ['exponential', 1.6], ['zoom'], 10, base * 0.3, 14, base * 1.4, 18, base * 10];
+  const width = (base: number): ExpressionSpecification => ['interpolate', ['exponential', 1.5], ['zoom'], 10, base * 0.4, 14, base * 1.6, 18, base * 9];
+  const cls = (...v: string[]): ExpressionSpecification => ['in', ['get', 'class'], ['literal', v]];
 
   return {
     version: 8,
@@ -25,45 +51,42 @@ export function brandStyle(theme: Theme): StyleSpecification {
     sources: { omt: { type: 'vector', url: TILES } },
     layers: [
       { id: 'land', type: 'background', paint: { 'background-color': pal.land } },
-      { id: 'park', type: 'fill', source: 'omt', 'source-layer': 'park', paint: { 'fill-color': pal.park } },
-      { id: 'landcover', type: 'fill', source: 'omt', 'source-layer': 'landcover', filter: ['in', ['get', 'class'], ['literal', ['grass', 'wood']]], paint: { 'fill-color': pal.park, 'fill-opacity': 0.7 } },
+      { id: 'green', type: 'fill', source: 'omt', 'source-layer': 'park', paint: { 'fill-color': pal.green } },
+      { id: 'landcover', type: 'fill', source: 'omt', 'source-layer': 'landcover', filter: cls('grass', 'wood'), paint: { 'fill-color': pal.green } },
       { id: 'water', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': pal.water } },
-      { id: 'waterway', type: 'line', source: 'omt', 'source-layer': 'waterway', paint: { 'line-color': pal.water, 'line-width': 1.5 } },
-      { id: 'building', type: 'fill', source: 'omt', 'source-layer': 'building', minzoom: 14, paint: { 'fill-color': pal.building } },
+      { id: 'waterway', type: 'line', source: 'omt', 'source-layer': 'waterway', minzoom: 12, paint: { 'line-color': pal.water, 'line-width': 1.5 } },
+      // Gebäude erst nah dran und nur als leiser Ton, damit Straßenzüge lesbar bleiben
+      { id: 'building', type: 'fill', source: 'omt', 'source-layer': 'building', minzoom: 15, paint: { 'fill-color': pal.building, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 16, 1] } },
       {
-        id: 'road-casing', type: 'line', source: 'omt', 'source-layer': 'transportation',
-        filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor']]],
+        id: 'road-minor', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 13,
+        filter: cls('minor', 'service', 'tertiary'),
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': pal.casing, 'line-width': roadWidth(1.4), 'line-gap-width': 0 },
-      },
-      {
-        id: 'road-minor', type: 'line', source: 'omt', 'source-layer': 'transportation',
-        filter: ['in', ['get', 'class'], ['literal', ['minor', 'service', 'tertiary']]],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': pal.road, 'line-width': roadWidth(1) },
+        paint: { 'line-color': pal.minor, 'line-width': width(0.9) },
       },
       {
         id: 'road-major', type: 'line', source: 'omt', 'source-layer': 'transportation',
-        filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary']]],
+        filter: cls('motorway', 'trunk', 'primary', 'secondary'),
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': pal.major, 'line-width': roadWidth(1.3) },
-      },
-      { id: 'rail', type: 'line', source: 'omt', 'source-layer': 'transportation', filter: ['==', ['get', 'class'], 'rail'], paint: { 'line-color': pal.rail, 'line-width': 1.2, 'line-dasharray': [3, 3] } },
-      {
-        id: 'boundary', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['==', ['get', 'admin_level'], 2],
-        paint: { 'line-color': c('navy-400'), 'line-width': 1.5, 'line-dasharray': [4, 3] },
+        paint: { 'line-color': pal.major, 'line-opacity': pal.majorOpacity, 'line-width': width(1.1) },
       },
       {
-        id: 'road-label', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 15,
+        id: 'border', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['==', ['get', 'admin_level'], 2],
+        paint: { 'line-color': pal.border, 'line-width': 1, 'line-dasharray': [3, 3] },
+      },
+      // Straßennamen nur ganz nah, Ortsteile und Städte sonst
+      {
+        id: 'road-label', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 16,
         layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': font, 'text-size': 12 },
         paint: { 'text-color': pal.label, 'text-halo-color': pal.halo, 'text-halo-width': 1.5 },
       },
       {
         id: 'place-label', type: 'symbol', source: 'omt', 'source-layer': 'place',
-        filter: ['in', ['get', 'class'], ['literal', ['city', 'town', 'village', 'suburb', 'quarter', 'neighbourhood']]],
+        filter: cls('city', 'town', 'suburb', 'quarter'),
         layout: {
-          'text-field': ['coalesce', ['get', 'name:de'], ['get', 'name']], 'text-font': font,
-          'text-size': ['match', ['get', 'class'], 'city', 16, 'town', 14, 13],
+          'text-field': ['coalesce', ['get', 'name:de'], ['get', 'name']],
+          'text-font': font,
+          'text-size': ['match', ['get', 'class'], 'city', 15, 'town', 14, 12],
+          'text-max-width': 8,
         },
         paint: { 'text-color': pal.label, 'text-halo-color': pal.halo, 'text-halo-width': 1.5 },
       },

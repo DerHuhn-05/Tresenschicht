@@ -8,8 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "tokens": "node scripts/build-tokens.mjs",
-    "import:pubs": "node scripts/import-osm.mjs",
-    "import:countries": "node scripts/import-countries.mjs"
+    "import:countries": "node scripts/import-countries.mjs",
+    "osm:csv": "node scripts/osm-to-csv.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",

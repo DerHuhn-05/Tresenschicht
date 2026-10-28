@@ -1,0 +1,56 @@
+# Lädt Ländergrenzen (Natural Earth) und Kneipen, Bars, Biergärten (OpenStreetMap über Geofabrik)
+# in die Supabase-Datenbank. Start: Actions → „Kneipen importieren“ → Run workflow.
+# Secret: SUPABASE_DB_URL (Supabase → Connect → Session pooler, mit deinem Datenbank-Passwort)
+name: Kneipen importieren
+on:
+  workflow_dispatch:
+    inputs:
+      regionen:
+        description: 'Geofabrik-Regionen (Europa), durch Leerzeichen getrennt. Zum Testen z. B. nur: germany'
+        default: 'germany austria switzerland france belgium netherlands luxembourg denmark poland czech-republic'
+        required: true
+  schedule:
+    - cron: '23 3 1 * *' # am 1. jedes Monats aktualisieren
+concurrency: import-osm
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      REGIONEN: ${{ inputs.regionen || 'germany austria switzerland france belgium netherlands luxembourg denmark poland czech-republic' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Werkzeuge installieren
+        run: sudo apt-get update -q && sudo apt-get install -y -q osmium-tool postgresql-client
+      - name: Verbindung prüfen
+        run: |
+          if [ -z "$DB_URL" ]; then echo "::error::Das Secret SUPABASE_DB_URL fehlt (Settings → Secrets and variables → Actions)."; exit 1; fi
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -tAc "select 'Verbindung ok, Tabelle pubs vorhanden: ' || (to_regclass('public.pubs') is not null)"
+      - name: Ländergrenzen laden
+        run: |
+          curl -fsSL -o ne.geojson https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_admin_0_countries.geojson \
+            || curl -fsSL -o ne.geojson https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries.geojson
+          node scripts/import-countries.mjs ne.geojson > countries.sql
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f countries.sql
+          psql "$DB_URL" -tAc "select string_agg(code, ' ' order by code) from countries"
+      - name: Kneipen aus OpenStreetMap filtern
+        run: |
+          : > pubs.geojsonseq
+          for r in $REGIONEN; do
+            echo "::group::$r"
+            curl -fsSL --retry 3 -o region.osm.pbf "https://download.geofabrik.de/europe/$r-latest.osm.pbf"
+            ls -lh region.osm.pbf
+            osmium tags-filter region.osm.pbf nwr/amenity=pub,bar,biergarten -o filtered.osm.pbf --overwrite
+            osmium export filtered.osm.pbf -f geojsonseq --add-unique-id=type_id --geometry-types=point,polygon -o region.geojsonseq --overwrite
+            wc -l < region.geojsonseq
+            cat region.geojsonseq >> pubs.geojsonseq
+            rm -f region.osm.pbf filtered.osm.pbf region.geojsonseq
+            echo "::endgroup::"
+          done
+          node scripts/osm-to-csv.mjs pubs.geojsonseq > pubs.csv
+      - name: In die Datenbank schreiben
+        run: psql "$DB_URL" -f supabase/import-pubs.sql

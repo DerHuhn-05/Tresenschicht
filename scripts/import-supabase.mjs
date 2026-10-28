@@ -46,18 +46,29 @@ if (cmd === 'check') {
   console.log(`Verbindung ok (Serverzeit ${now}), ${count} Kneipen in der Datenbank.`);
 } else if (cmd === 'countries') {
   const fc = JSON.parse(readFileSync(file, 'utf8'));
-  let n = 0;
+  // Ein Land kann mehrere Einträge haben (Frankreich und Clipperton-Insel heißen beide FR): zusammenfügen statt überschreiben
+  const parts = new Map();
   for (const f of fc.features) {
     const p = f.properties;
     const code = [p.ISO_A2_EH, p.ISO_A2, p.iso_a2].find((x) => x && x !== '-99');
-    if (!ALLOWED.includes(code)) continue;
-    const { error } = await sb.rpc('import_country', { p_code: code, p_name: p.NAME_DE ?? p.NAME ?? code, p_geom: f.geometry });
+    if (!ALLOWED.includes(code) || !f.geometry) continue;
+    const entry = parts.get(code) ?? { name: null, polygons: [] };
+    if (!entry.name || p.ADMIN === p.NAME) entry.name = p.NAME_DE ?? p.NAME ?? code;
+    const g = f.geometry;
+    if (g.type === 'Polygon') entry.polygons.push(g.coordinates);
+    else if (g.type === 'MultiPolygon') entry.polygons.push(...g.coordinates);
+    parts.set(code, entry);
+  }
+  let n = 0;
+  for (const [code, { name, polygons }] of parts) {
+    const geometry = { type: 'MultiPolygon', coordinates: polygons };
+    const { error } = await sb.rpc('import_country', { p_code: code, p_name: name, p_geom: geometry });
     if (error && /Arbeitsbereich/.test(error.message)) {
       console.log(`::warning::Land ${code} übersprungen: Die Datenbank kennt es noch nicht. Führe supabase/import-functions.sql im SQL-Editor erneut aus und starte den Import noch einmal.`);
       continue;
     }
-    if (error) await rpc('import_country', { p_code: code, p_name: p.NAME_DE ?? p.NAME ?? code, p_geom: f.geometry });
-    console.log(`Land ${code} gespeichert`);
+    if (error) await rpc('import_country', { p_code: code, p_name: name, p_geom: geometry });
+    console.log(`Land ${code} gespeichert (${polygons.length} Flächen)`);
     n++;
   }
   if (n !== ALLOWED.length) console.log(`::warning::Nur ${n} von ${ALLOWED.length} Ländern gefunden.`);

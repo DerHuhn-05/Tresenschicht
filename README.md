@@ -18,13 +18,12 @@ zu einer Stelle mit mehreren Treffern.
 
 1. Projekt auf supabase.com anlegen, Region **EU (Frankfurt)**.
 2. SQL-Editor: `supabase/schema.sql` ausführen.
-3. Ländergrenzen und Kneipen: im GitHub-Repo das Secret `SUPABASE_DB_URL` anlegen (Supabase → **Connect** →
-   **Session pooler**, `[YOUR-PASSWORD]` durch das Datenbank-Passwort ersetzen). Dann Actions → **Kneipen importieren** →
-   Run workflow. Der Workflow lädt die Ländergrenzen (Natural Earth) und die OSM-Auszüge von Geofabrik, filtert
-   Kneipen, Bars und Biergärten (ohne Clubs, ohne Geschlossenes) und schreibt sie in die Datenbank. Zum Testen nur
-   `germany` eintragen. Er läuft danach am 1. jedes Monats von selbst und hält die Daten aktuell.
-4. Lokal geht es auch: `osmium tags-filter … nwr/amenity=pub,bar,biergarten`, `osmium export … -f geojsonseq --add-unique-id=type_id`,
-   `node scripts/osm-to-csv.mjs pubs.geojsonseq > pubs.csv`, dann `psql "$DB_URL" -f supabase/import-pubs.sql`.
+3. Import-Funktionen: im SQL-Editor einmal `supabase/import-functions.sql` ausführen (bei neuen Projekten schon in
+   `schema.sql` enthalten).
+4. Ländergrenzen und Kneipen: GitHub → Actions → **Kneipen importieren** → Run workflow. Braucht die Secrets
+   `VITE_SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`. Der Workflow lädt die Ländergrenzen (Natural Earth) und die
+   OSM-Auszüge von Geofabrik, filtert Kneipen, Bars und Biergärten (ohne Clubs, ohne Geschlossenes) und schreibt sie in
+   die Datenbank. Zum Testen nur `germany` eintragen. Er läuft danach am 1. jedes Monats von selbst.
 5. `.env.example` nach `.env` kopieren, `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` eintragen.
 6. Dein Konto zum Prüfer machen: `update profiles set is_admin = true where username = 'deinname';`
 7. Unter Authentication → URL Configuration die Adresse der App als Site URL eintragen (für Bestätigungs- und Passwort-Links).

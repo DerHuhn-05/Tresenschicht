@@ -124,11 +124,16 @@ export function Empty({ icon, title, text, action }: { icon: IconName; title: st
   );
 }
 
-export function Notice({ icon = 'info', children }: { icon?: IconName; children: ReactNode }) {
+export function Notice({ icon = 'info', children, onClose }: { icon?: IconName; children: ReactNode; onClose?: () => void }) {
   return (
-    <div className="notice" role="note">
+    <div className={`notice${onClose ? ' closable' : ''}`} role="note">
       <Icon name={icon} size={20} />
       <div>{children}</div>
+      {onClose && (
+        <button className="notice-close" onClick={onClose} aria-label={t('Hinweis ausblenden')}>
+          <Icon name="close" size={18} />
+        </button>
+      )}
     </div>
   );
 }

@@ -31,3 +31,9 @@ export function inWorkArea(p: LatLon): boolean {
   }
   return inside;
 }
+
+/** Zoomstufe, bei der rund um `pos` etwa `meters` Umkreis zu sehen sind (MapLibre, 512-px-Kacheln). */
+export function zoomForRadius(lat: number, meters: number, widthPx = Math.min(globalThis.innerWidth || 390, 480)): number {
+  const z = Math.log2((40075016.686 * Math.cos((lat * Math.PI) / 180) * (widthPx / 2)) / (512 * meters));
+  return Math.max(3, Math.min(18, z));
+}

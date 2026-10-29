@@ -54,7 +54,7 @@ export const DEMO_PUBS: Pub[] = SEEDS.map(([name, type, base, e, n, street], i) 
     country: 'DE',
     status: 'aktiv',
     source: 'osm',
-    features: { outdoor: type === 'biergarten' || i % 3 === 0, darts: i % 4 === 1, cards: i % 2 === 0, wheelchair: i % 5 === 0 },
+    features: { outdoor: type === 'biergarten' || i % 3 === 0, darts: i % 4 === 1, cards: i % 2 === 0, wheelchair: i % 5 === 0, smoking: type !== 'biergarten' && i % 3 === 1 },
   };
 });
 

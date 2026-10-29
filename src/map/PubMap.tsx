@@ -13,6 +13,8 @@ export interface PubMapHandle {
   flyTo(pos: LatLon, zoom?: number): void;
   fit(points: LatLon[]): void;
   center(): LatLon;
+  /** true, sobald der Nutzer die Karte selbst verschoben oder gezoomt hat */
+  touched(): boolean;
 }
 
 interface Props {
@@ -157,6 +159,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
   const map = useRef<MlMap | null>(null);
   const nameTag = useRef<maplibregl.Marker | null>(null);
   const [offline, setOffline] = useState(false);
+  const touchedRef = useRef(false);
   const offlineRef = useRef(false);
   const tiled = !!loadTile;
 
@@ -183,6 +186,9 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     center() {
       const c = map.current!.getCenter();
       return { lat: c.lat, lon: c.lng };
+    },
+    touched() {
+      return touchedRef.current;
     },
   }));
 
@@ -441,6 +447,9 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     });
     m.on('mousemove', (e) => {
       m.getCanvas().style.cursor = hit(e.point) ? 'pointer' : '';
+    });
+    m.on('movestart', (e: any) => {
+      if (e.originalEvent) touchedRef.current = true; // Finger oder Maus, nicht flyTo
     });
     m.on('moveend', () => {
       loadVisible();

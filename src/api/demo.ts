@@ -4,8 +4,9 @@ import { GPS_ALLOWANCE_M, LOCK_MINUTES, MAX_ACCURACY_M, RADIUS_M, SAME_PUB_HOURS
 import { load, save } from '../lib/storage';
 import { CELLS_PER_TILE, DETAIL_ZOOM, latToTileY, lonToTileX } from '../lib/tiles';
 import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
+import { searchFilter } from './search';
 import type {
-  Api, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, User,
+  Api, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, User,
 } from './types';
 import { t } from '../lib/i18n';
 
@@ -286,16 +287,17 @@ export class DemoApi implements Api {
     return this.wait({ inArea: true, pubs });
   }
 
-  async searchPubs(query: string, features: PubFeature[] = []) {
+  async searchPubs(query: string, opts: PubSearch = {}) {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
-    const words = q.split(/\s+/);
-    return this.wait(
-      this.db.pubs
-        .filter((p) => p.status === 'aktiv' && words.every((w) => `${p.name} ${p.city} ${p.address}`.toLowerCase().includes(w)))
-        .filter((p) => features.every((f) => p.features?.[f]))
-        .slice(0, 30)
-    );
+    if (!q && !(opts.near && opts.category)) return [];
+    const { features, types } = searchFilter(opts);
+    const words = q ? q.split(/\s+/) : [];
+    const near = opts.near;
+    const hits = this.db.pubs
+      .filter((p) => p.status === 'aktiv' && words.every((w) => `${p.name} ${p.city} ${p.address}`.toLowerCase().includes(w)))
+      .filter((p) => features.every((f) => p.features?.[f]) && (!types.length || types.includes(p.type)));
+    if (!q && near) hits.sort((a, b) => distanceM(near, a) - distanceM(near, b));
+    return this.wait(hits.slice(0, 40));
   }
 
   async bookmarks() {

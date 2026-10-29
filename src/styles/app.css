@@ -487,6 +487,22 @@ textarea.input {
   flex: none;
   margin-top: -1px;
 }
+.notice > div { flex: 1; min-width: 0; }
+.notice.closable { padding-right: var(--space-1); }
+/* Ausblenden: große Tippfläche, kleines Kreuz */
+.notice-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: -8px -2px -8px 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1339,3 +1355,21 @@ textarea.input {
   .welcome .btn-stack > * + * { margin-top: var(--space-2); }
   .section { margin-top: var(--space-6); }
 }
+
+/* Suche: Kategorien groß und deutlich, Ausstattung kleiner darunter */
+.filter-label {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.category-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.category-chips .chip { justify-content: flex-start; min-height: 48px; }
+.chips-small .chip { padding: 0 var(--space-3); font-size: 14px; }

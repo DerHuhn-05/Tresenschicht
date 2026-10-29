@@ -457,4 +457,11 @@ export const EN: Record<string, string> = {
   "10 Bars gesammelt": "10 bars collected",
   "Klarer Kopf": "Clear head",
   "5 Besuche mit alkoholfreiem Getränk": "5 check-ins with an alcohol-free drink",
+  "Rauchen erlaubt": "Smoking allowed",
+  "Raucherkneipe": "Smoking pub",
+  "Kategorie": "Category",
+  "In deiner Nähe": "Near you",
+  "Hinweis ausblenden": "Hide notice",
+  "Gib einen Namen oder eine Stadt ein. Ohne Suchtext zeigt die Kategorie die nächsten Treffer, sobald dein Standort bekannt ist.": "Enter a name or a city. Without text, the category shows the nearest results as soon as your location is known.",
+  "Suche nach Name und Stadt oder wähle eine Kategorie für Treffer in deiner Nähe. Kategorie und Ausstattung zeigen nur Kneipen, bei denen das in OpenStreetMap eingetragen ist.": "Search by name and city, or choose a category for results near you. Category and amenities only show pubs where this is listed in OpenStreetMap.",
 };

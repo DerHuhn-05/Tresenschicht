@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type CheckIn, type Pub, type PubFeature, type PubType, type ReportItem } from '../api';
+import { api, type CheckIn, type Pub, type PubCategory, type PubFeature, type PubType, type ReportItem } from '../api';
 import { Icon, type IconName } from '../components/Icon';
 import { Confirm, Field, Notice, Page, PhotoPicker, Spinner } from '../components/ui';
 import { formatDate, formatDistance, PUB_TYPE_LABEL, relativeTime } from '../lib/format';
@@ -17,8 +17,19 @@ export const FEATURE_LABEL: Record<PubFeature, string> = {
   darts: t('Dart'),
   cards: t('Kartenzahlung'),
   wheelchair: t('Rollstuhlgerecht'),
+  smoking: t('Rauchen erlaubt'),
 };
-const FEATURES = Object.keys(FEATURE_LABEL) as PubFeature[];
+/** Ausstattung als Zusatzfilter in der Suche (Rauchen steckt in der Kategorie Raucherkneipe) */
+const FEATURES: PubFeature[] = ['outdoor', 'darts', 'cards', 'wheelchair'];
+/** Angaben auf der Kneipenseite */
+const SHOWN_FEATURES: PubFeature[] = [...FEATURES, 'smoking'];
+
+const CATEGORIES: { id: PubCategory; label: string; icon: IconName }[] = [
+  { id: 'kneipe', label: t('Kneipe'), icon: 'pub' },
+  { id: 'raucherkneipe', label: t('Raucherkneipe'), icon: 'smoking' },
+  { id: 'bar', label: t('Bar'), icon: 'bar' },
+  { id: 'biergarten', label: t('Biergarten'), icon: 'biergarten' },
+];
 
 export function PubDetail({ id }: { id: string }) {
   const app = useApp();
@@ -67,9 +78,9 @@ export function PubDetail({ id }: { id: string }) {
           </div>
         )}
       </dl>
-      {FEATURES.some((f) => pub.features?.[f]) && (
+      {SHOWN_FEATURES.some((f) => pub.features?.[f]) && (
         <ul className="chips" style={{ marginTop: 12, padding: 0, listStyle: 'none' }} aria-label={t('Ausstattung')}>
-          {FEATURES.filter((f) => pub.features?.[f]).map((f) => (
+          {SHOWN_FEATURES.filter((f) => pub.features?.[f]).map((f) => (
             <li key={f} className="tag">{FEATURE_LABEL[f]}</li>
           ))}
         </ul>
@@ -215,12 +226,17 @@ export function SearchScreen() {
   const app = useApp();
   const [q, setQ] = useState('');
   const [filters, setFilters] = useState<PubFeature[]>([]);
+  const [category, setCategory] = useState<PubCategory | null>(null);
   const [results, setResults] = useState<Pub[] | null>(null);
+  const near = app.location.pos;
+  // Ohne Suchtext, aber mit Kategorie: die nächsten Treffer um deinen Standort
+  const nearby = !q.trim() && !!category && !!near;
   useEffect(() => {
-    if (!q.trim()) return setResults(null);
-    const timer = setTimeout(() => api.searchPubs(q, filters).then(setResults).catch(() => setResults([])), 220);
+    if (!q.trim() && !nearby) return setResults(null);
+    const timer = setTimeout(() => api.searchPubs(q, { features: filters, category, near }).then(setResults).catch(() => setResults([])), 220);
     return () => clearTimeout(timer);
-  }, [q, filters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, filters, category, nearby]);
   return (
     <Page onBack={app.pop} title={t('Suchen')}>
       <div className="input-icon">
@@ -236,7 +252,20 @@ export function SearchScreen() {
           enterKeyHint="search"
         />
       </div>
-      <div className="chips" role="group" aria-label={t('Filter')} style={{ marginTop: 12 }}>
+      <p className="filter-label" id="cat-label">{t('Kategorie')}</p>
+      <div className="chips category-chips" role="group" aria-labelledby="cat-label">
+        {CATEGORIES.map((c) => {
+          const on = category === c.id;
+          return (
+            <button key={c.id} type="button" className="chip" aria-pressed={on} onClick={() => setCategory(on ? null : c.id)}>
+              <Icon name={c.icon} size={20} muted={!on} />
+              {c.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="filter-label" id="feat-label">{t('Ausstattung')}</p>
+      <div className="chips chips-small" role="group" aria-labelledby="feat-label">
         {FEATURES.map((f) => {
           const on = filters.includes(f);
           return (
@@ -249,7 +278,11 @@ export function SearchScreen() {
       </div>
       <div style={{ marginTop: 20 }}>
         {results === null ? (
-          <p className="muted">{t('Suche nach Name und Stadt. Mehrere Wörter grenzen ein. Die Filter zeigen nur Kneipen, bei denen die Ausstattung in OpenStreetMap eingetragen ist.')}</p>
+          <p className="muted">
+            {category && !near
+              ? t('Gib einen Namen oder eine Stadt ein. Ohne Suchtext zeigt die Kategorie die nächsten Treffer, sobald dein Standort bekannt ist.')
+              : t('Suche nach Name und Stadt oder wähle eine Kategorie für Treffer in deiner Nähe. Kategorie und Ausstattung zeigen nur Kneipen, bei denen das in OpenStreetMap eingetragen ist.')}
+          </p>
         ) : results.length === 0 ? (
           <div className="stack">
             <p>{t('Keine Kneipe gefunden.')}</p>
@@ -259,6 +292,8 @@ export function SearchScreen() {
             </button>
           </div>
         ) : (
+          <>
+          {nearby && <p className="t-secondary muted" style={{ marginBottom: 8 }}>{t('In deiner Nähe')}</p>}
           <ul className="list" aria-label={t('{n} Treffer', { n: results.length })}>
             {results.map((p) => (
               <li key={p.id}>
@@ -276,6 +311,7 @@ export function SearchScreen() {
               </li>
             ))}
           </ul>
+          </>
         )}
       </div>
     </Page>

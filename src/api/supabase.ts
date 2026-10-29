@@ -1,9 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { LatLon } from '../lib/geo';
 import type {
-  Api, Bounds, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, SignUpData, User,
+  Api, Bounds, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, SignUpData, User,
 } from './types';
 import { t } from '../lib/i18n';
+import { searchFilter } from './search';
 
 // Echtes Backend (supabase/schema.sql). Alle Regeln prüft der Server; die App zeigt nur an.
 type Row = Record<string, any>;
@@ -204,9 +205,12 @@ export class SupabaseApi implements Api {
     return { inArea: r.inArea, pubs: (r.pubs as Row[]).map((p) => ({ ...toPub(p), distance: p.distance })) };
   }
 
-  async searchPubs(query: string, features: PubFeature[] = []) {
-    if (!query.trim()) return [];
-    return (must(await this.sb.rpc('search_pubs', { q: query, p_features: features })) as Row[]).map(toPub);
+  async searchPubs(query: string, opts: PubSearch = {}) {
+    const { features, types } = searchFilter(opts);
+    if (!query.trim() && !(opts.near && opts.category)) return [];
+    return (must(await this.sb.rpc('search_pubs', {
+      q: query.trim(), p_features: features, p_types: types, p_lat: opts.near?.lat ?? null, p_lon: opts.near?.lon ?? null,
+    })) as Row[]).map(toPub);
   }
 
   async bookmarks() {

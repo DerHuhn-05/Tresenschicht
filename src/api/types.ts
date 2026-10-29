@@ -4,7 +4,15 @@ export type PubType = 'kneipe' | 'bar' | 'biergarten';
 export type PubStatus = 'aktiv' | 'geschlossen' | 'zu_pruefen';
 
 /** Ausstattung aus OpenStreetMap, für die Suchfilter */
-export type PubFeature = 'outdoor' | 'darts' | 'cards' | 'wheelchair';
+export type PubFeature = 'outdoor' | 'darts' | 'cards' | 'wheelchair' | 'smoking';
+/** Kategorien der Suche; Raucherkneipe ist eine Kneipe oder Bar, in der drinnen geraucht werden darf */
+export type PubCategory = 'kneipe' | 'raucherkneipe' | 'bar' | 'biergarten';
+export interface PubSearch {
+  features?: PubFeature[];
+  category?: PubCategory | null;
+  /** ohne Suchtext: die nächsten Treffer um diesen Punkt */
+  near?: LatLon;
+}
 
 export interface Pub {
   id: string;
@@ -219,7 +227,7 @@ export interface Api {
   countryTotals(): Promise<CountryTotal[]>;
   nearestPubs(pos: LatLon, limit?: number): Promise<NearbyPub[]>;
   nearbyPubs(pos: LatLon, accuracy: number): Promise<NearbyResult>;
-  searchPubs(query: string, features?: PubFeature[]): Promise<Pub[]>;
+  searchPubs(query: string, opts?: PubSearch): Promise<Pub[]>;
   bookmarks(): Promise<Pub[]>;
   setBookmark(pubId: string, on: boolean): Promise<void>;
   getPub(id: string): Promise<Pub | null>;

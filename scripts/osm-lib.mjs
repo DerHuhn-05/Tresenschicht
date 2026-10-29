@@ -11,6 +11,8 @@ export function features(t, type) {
   if (t.darts === 'yes' || /(^|;)\s*darts\s*(;|$)/.test(t.sport ?? '')) f.darts = true;
   if (CARD_TAGS.some((k) => t[k] === 'yes')) f.cards = true;
   if (t.wheelchair === 'yes') f.wheelchair = true;
+  // Rauchen drinnen erlaubt (auch eigener Raucherraum): für die Kategorie Raucherkneipe
+  if (['yes', 'dedicated', 'isolated'].includes(t.smoking)) f.smoking = true;
   return f;
 }
 

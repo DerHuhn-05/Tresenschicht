@@ -5,9 +5,12 @@ import { Icon } from '../components/Icon';
 import { Notice, Sheet } from '../components/ui';
 import { PubMap, type PubMapHandle } from '../map/LazyMap';
 import { countdown, formatDistance, PUB_TYPE_LABEL } from '../lib/format';
-import { distanceM } from '../lib/geo';
+import { distanceM, zoomForRadius } from '../lib/geo';
 import { isDemo, useApp, useNow } from '../state/app';
 import { t } from '../lib/i18n';
+
+/** Umkreis beim Start der Karte */
+const START_RADIUS_M = 300;
 
 export function MapScreen() {
   const app = useApp();
@@ -47,13 +50,18 @@ export function MapScreen() {
     if (location.pos) mapRef.current?.flyTo(location.pos, 16);
   }
 
+  // Start: dein Standort mit etwa 300 m Umkreis. Ohne Standort bleibt die Übersicht; hast du die Karte
+  // schon selbst bewegt, springt sie nicht mehr.
   const firstFix = useRef(false);
   useEffect(() => {
-    if (location.pos && !firstFix.current) {
-      firstFix.current = true;
-      mapRef.current?.flyTo(location.pos, 16);
-    }
-  }, [location.pos]);
+    if (!location.pos || firstFix.current || !mapRef.current) return;
+    firstFix.current = true;
+    if (!mapRef.current.touched()) mapRef.current.flyTo(location.pos, zoomForRadius(location.pos.lat, START_RADIUS_M));
+  });
+
+  // Hinweise lassen sich ausblenden; nach einem Tab-Wechsel erscheinen sie wieder (der Bildschirm wird neu aufgebaut)
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const hide = (k: string) => () => setHidden((h) => new Set(h).add(k));
 
   const lockRemaining = lockedUntil ? countdown(lockedUntil, now) : null;
 
@@ -70,6 +78,7 @@ export function MapScreen() {
           onSelect={setSelected}
           userPos={location.pos}
           initialCenter={location.pos}
+          initialZoom={location.pos ? zoomForRadius(location.pos.lat, START_RADIUS_M) : undefined}
           onMove={(_, c) => setCenter(c)}
           onMapClick={
             placing
@@ -135,28 +144,28 @@ export function MapScreen() {
             {t('Nächster Check-in in {time}', { time: lockRemaining })}
           </button>
         )}
-        {hint === 'accuracy' && (
-          <Notice icon="warning">
+        {hint === 'accuracy' && !hidden.has('accuracy') && (
+          <Notice icon="warning" onClose={hide('accuracy')}>
             {t('Standort zu ungenau (± {n} m).', { n: Math.round(location.accuracy ?? 0) })}{' '}
             <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.requestLocation()}>
               {t('Noch einmal versuchen')}
             </button>
           </Notice>
         )}
-        {hint === 'area' && <Notice>{t('Check-ins gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien. Die Karte kannst du überall ansehen.')}</Notice>}
-        {(location.status === 'denied' || location.status === 'unavailable') && !location.simulated && (
-          <Notice icon="location-off">
+        {hint === 'area' && !hidden.has('area') && <Notice onClose={hide('area')}>{t('Check-ins gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien. Die Karte kannst du überall ansehen.')}</Notice>}
+        {(location.status === 'denied' || location.status === 'unavailable') && !location.simulated && !hidden.has('denied') && (
+          <Notice icon="location-off" onClose={hide('denied')}>
             {t('Kein Standort. Öffne die Einstellungen und erlaube den Zugriff, während die App geöffnet ist.')}{' '}
             <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.push({ kind: 'locationHelp' })}>
               {t('So geht’s')}
             </button>
           </Notice>
         )}
-        {location.status === 'asking' && !location.simulated && (
-          <Notice icon="location">{t('Standort wird bestimmt … Erlaube den Zugriff, wenn dein iPhone fragt.')}</Notice>
+        {location.status === 'asking' && !location.simulated && !hidden.has('asking') && (
+          <Notice icon="location" onClose={hide('asking')}>{t('Standort wird bestimmt … Erlaube den Zugriff, wenn dein iPhone fragt.')}</Notice>
         )}
-        {location.status === 'off' && !location.simulated && (
-          <Notice icon="location">
+        {location.status === 'off' && !location.simulated && !hidden.has('off') && (
+          <Notice icon="location" onClose={hide('off')}>
             {t('Für den Check-in braucht die App deinen Standort, nur solange sie offen ist.')}{' '}
             <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.requestLocation()}>
               {t('Standort erlauben')}

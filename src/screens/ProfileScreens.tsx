@@ -108,7 +108,7 @@ export function ProfileScreen() {
         </section>
       )}
 
-      <p className="t-legal muted" style={{ marginTop: 32 }}>Kartendaten © OpenStreetMap contributors (ODbL). Kneipen-App, Arbeitstitel.</p>
+      <p className="t-legal muted" style={{ marginTop: 32 }}>Kartendaten © OpenStreetMap contributors (ODbL). Tresenschicht.</p>
 
       {ask === 'logout' && (
         <Confirm title="Abmelden?" text="Deine Kneipen bleiben gespeichert." confirm="Abmelden" onCancel={() => setAsk(null)}

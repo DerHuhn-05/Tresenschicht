@@ -40,7 +40,7 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
           <path d="M5 12.5v7h14v-7" />
           <path d="M10 19.5v-3.5a2 2 0 0 1 4 0v3.5" />
         </svg>
-        <h1 className="t-display">Kneipen-App</h1>
+        <h1 className="t-display">Tresenschicht</h1>
         <p className="lead t-body">Sammle die Kneipen, in denen du warst. Ein Tipp beim Reinkommen reicht. Deine Freunde sehen, wo ihr schon überall wart.</p>
       </div>
       <div className="btn-stack">

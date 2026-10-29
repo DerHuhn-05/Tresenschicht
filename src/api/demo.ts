@@ -2,9 +2,10 @@ import { distanceM, inWorkArea, type LatLon } from '../lib/geo';
 import { blobToDataUrl } from '../lib/image';
 import { LOCK_MINUTES, MAX_ACCURACY_M, RADIUS_M, SAME_PUB_HOURS } from '../lib/rules';
 import { load, save } from '../lib/storage';
+import { CELLS_PER_TILE, DETAIL_ZOOM, latToTileY, lonToTileX } from '../lib/tiles';
 import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
 import type {
-  Api, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, User,
+  Api, PubTile, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, User,
 } from './types';
 
 // Demo-Backend: dieselben Regeln wie der Server, Daten nur im Browser (localStorage).
@@ -215,6 +216,39 @@ export class DemoApi implements Api {
   // Kneipen
   async pubsInBounds() {
     return this.wait(this.db.pubs.filter((p) => p.status === 'aktiv'), 0);
+  }
+
+  // Dieselbe Rechnung wie pub_tile() auf dem Server
+  async pubTile(z: number, x: number, y: number): Promise<PubTile> {
+    const inTile = this.db.pubs.filter((p) => p.status === 'aktiv' && Math.floor(lonToTileX(p.lon, z)) === x && Math.floor(latToTileY(p.lat, z)) === y);
+    if (z >= DETAIL_ZOOM) return this.wait({ pubs: inTile }, 60);
+    const cells = new Map<string, Pub[]>();
+    for (const p of inTile) {
+      const k = `${Math.floor((lonToTileX(p.lon, z) - x) * CELLS_PER_TILE)}/${Math.floor((latToTileY(p.lat, z) - y) * CELLS_PER_TILE)}`;
+      cells.set(k, [...(cells.get(k) ?? []), p]);
+    }
+    return this.wait(
+      {
+        cells: [...cells.values()].map((ps) => ({
+          count: ps.length,
+          lat: ps.reduce((a, p) => a + p.lat, 0) / ps.length,
+          lon: ps.reduce((a, p) => a + p.lon, 0) / ps.length,
+          pub: ps.length === 1 ? ps[0] : null,
+        })),
+      },
+      60
+    );
+  }
+
+  async nearestPubs(pos: LatLon, limit = 100) {
+    return this.wait(
+      this.db.pubs
+        .filter((p) => p.status === 'aktiv')
+        .map((p) => ({ ...p, distance: distanceM(pos, p) }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, limit),
+      60
+    );
   }
 
   async nearbyPubs(pos: LatLon) {

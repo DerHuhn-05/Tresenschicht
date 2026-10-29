@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, type Bounds, type Pub } from '../api';
+import { api, type NearbyPub, type Pub } from '../api';
 import { DEMO_MULTI, DEMO_START } from '../api/demoData';
 import { Icon } from '../components/Icon';
 import { Notice, Sheet } from '../components/ui';
@@ -12,43 +12,33 @@ export function MapScreen() {
   const app = useApp();
   const { location, lockedUntil, lastCheckIn, hint } = app;
   const mapRef = useRef<PubMapHandle>(null);
-  const [pubs, setPubs] = useState<Pub[]>([]);
+  const [list, setList] = useState<NearbyPub[] | null>(null);
   const [collected, setCollected] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Pub | null>(null);
   const [view, setView] = useState<'map' | 'list'>('map');
   const [placing, setPlacing] = useState(false);
   const [lockSheet, setLockSheet] = useState(false);
   const [center, setCenter] = useState(location.pos);
-  const bounds = useRef<Bounds | null>(null);
   const now = useNow(!!lockedUntil);
-
-  async function loadPubs(b: Bounds) {
-    bounds.current = b;
-    try {
-      setPubs(await api.pubsInBounds(b));
-    } catch (e) {
-      app.notify((e as Error).message, 'error');
-    }
-  }
 
   useEffect(() => {
     api.collection().then((c) => setCollected(new Set(c.map((e) => e.pub.id)))).catch(() => {});
-    if (bounds.current) loadPubs(bounds.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.version]);
+
+  // Listenansicht: die nächsten 100 Kneipen um deinen Standort oder die Kartenmitte
+  const listRef = location.pos ?? center;
+  useEffect(() => {
+    if (view !== 'list' || !listRef) return;
+    api.nearestPubs(listRef, 100).then(setList).catch((e) => app.notify((e as Error).message, 'error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, listRef?.lat, listRef?.lon, app.version]);
 
   useEffect(() => {
     if (lockedUntil && Date.parse(lockedUntil) <= now) app.bump(); // Sperre abgelaufen: neu prüfen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now]);
 
-  const sortedList = useMemo(() => {
-    const ref = location.pos ?? center;
-    return [...pubs]
-      .map((p) => ({ p, d: ref ? distanceM(ref, p) : 0 }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 100);
-  }, [pubs, location.pos, center]);
+  const sortedList = useMemo(() => (list ?? []).map((p) => ({ p, d: p.distance })), [list]);
 
   function locate() {
     if (location.status === 'denied') return app.push({ kind: 'locationHelp' });
@@ -71,16 +61,14 @@ export function MapScreen() {
       {view === 'map' ? (
         <PubMap
           ref={mapRef}
-          pubs={pubs}
+          loadTile={(z, x, y) => api.pubTile(z, x, y)}
+          dataVersion={app.version}
           collected={collected}
           selectedId={selected?.id}
           onSelect={setSelected}
           userPos={location.pos}
           initialCenter={location.pos}
-          onMove={(b, c) => {
-            setCenter(c);
-            loadPubs(b);
-          }}
+          onMove={(_, c) => setCenter(c)}
           onMapClick={
             placing
               ? (pos) => {

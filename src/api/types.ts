@@ -122,6 +122,20 @@ export interface PubEdit {
   status: 'offen' | 'angenommen' | 'abgelehnt';
 }
 
+/** Ein Zählfeld der Karte: Anzahl Kneipen, mittlere Lage; bei genau einer Kneipe die Kneipe selbst. */
+export interface PubCell {
+  count: number;
+  lat: number;
+  lon: number;
+  pub?: Pub | null;
+}
+
+/** Inhalt einer Kartenkachel: unter Zoom 13 Zählfelder, ab Zoom 13 alle Kneipen. */
+export interface PubTile {
+  cells?: PubCell[];
+  pubs?: Pub[];
+}
+
 export interface Bounds {
   west: number;
   south: number;
@@ -148,6 +162,8 @@ export interface Api {
 
   // Kneipen (B, D)
   pubsInBounds(b: Bounds): Promise<Pub[]>;
+  pubTile(z: number, x: number, y: number): Promise<PubTile>;
+  nearestPubs(pos: LatLon, limit?: number): Promise<NearbyPub[]>;
   nearbyPubs(pos: LatLon, accuracy: number): Promise<NearbyResult>;
   searchPubs(query: string): Promise<Pub[]>;
   getPub(id: string): Promise<Pub | null>;

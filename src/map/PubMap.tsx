@@ -1,12 +1,11 @@
-import maplibregl, { type GeoJSONSource, type Map as MlMap } from 'maplibre-gl';
+import maplibregl, { type GeoJSONSource, type LayerSpecification, type Map as MlMap, type MapGeoJSONFeature } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import type { Bounds, Pub } from '../api';
-import markerDark from '../assets/pub-marker-dark.svg';
-import markerLight from '../assets/pub-marker.svg';
-import { PUB_TYPE_LABEL, spokenDistance } from '../lib/format';
-import { distanceM, type LatLon } from '../lib/geo';
-import { useTheme } from '../lib/theme';
+import type { Bounds, Pub, PubCell, PubTile } from '../api';
+import markerUrl from '../assets/pub-marker-dark.svg';
+import type { LatLon } from '../lib/geo';
+import { tokenColor } from '../lib/theme';
+import { DETAIL_ZOOM, tilesFor } from '../lib/tiles';
 import { brandStyle, fallbackStyle } from './style';
 
 export interface PubMapHandle {
@@ -16,7 +15,12 @@ export interface PubMapHandle {
 }
 
 interface Props {
-  pubs: Pub[];
+  /** Feste Liste, z. B. Sammlung oder eine einzelne Kneipe. */
+  pubs?: Pub[];
+  /** Hauptkarte: Kneipen kachelweise vom Server (Zählfelder unter Zoom 13, einzelne Kneipen ab Zoom 13). */
+  loadTile?: (z: number, x: number, y: number) => Promise<PubTile>;
+  /** Steigt, wenn sich Kneipendaten geändert haben (dann wird neu geladen). */
+  dataVersion?: number;
   collected?: Set<string>;
   selectedId?: string | null;
   onSelect?: (pub: Pub | null) => void;
@@ -28,25 +32,104 @@ interface Props {
   label?: string;
 }
 
-const CLUSTER_SIZE = (n: number) => (n < 10 ? 44 : n < 100 ? 52 : 60); // cluster-s, -m, -l
+// Farben für Pins und Sammel-Marker: auf der Nachtblau-Karte immer Bernstein mit Nachtblau (Design System, dunkel)
+const MARKER = tokenColor('marker', 'dark');
+const GLYPH = tokenColor('marker-glyph', 'dark');
+const DONE = tokenColor('sky-300', 'dark');
+const RATIO = Math.min(3, Math.max(2, Math.round(globalThis.devicePixelRatio || 2)));
+
+const LAYERS = ['cells-cluster', 'cells-pin', 'pubs-cluster', 'pubs-pin', 'selected-pin'];
+const clusterSize = (n: number) => (n < 10 ? 44 : n < 100 ? 52 : 60); // cluster-s, -m, -l
+const clusterLabel = (n: number) => (n > 999 ? `${Math.floor(n / 1000)}k` : String(n));
+
+/** Sammel-Marker als Bild mit Zahl: Bernstein-Kreis, Nachtblau-Ring und -Zahl. Braucht keine Kartenschrift. */
+function clusterImage(label: string) {
+  const n = label.endsWith('k') ? Number(label.slice(0, -1)) * 1000 : Number(label);
+  const s = clusterSize(n);
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = s * RATIO;
+  const g = cv.getContext('2d')!;
+  g.scale(RATIO, RATIO);
+  g.fillStyle = MARKER;
+  g.beginPath();
+  g.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = GLYPH;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.arc(s / 2, s / 2, s / 2 - 4.5, 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = GLYPH;
+  g.font = `800 ${label.length > 3 ? 15 : 17}px -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(label, s / 2, s / 2 + 1);
+  return g.getImageData(0, 0, cv.width, cv.height);
+}
+
+/** Pin aus dem Design System; „gesammelt“ bekommt einen Haken oben rechts (nicht nur Farbe). */
+function pinImage(img: HTMLImageElement, done: boolean) {
+  const w = 44;
+  const h = 50;
+  const cv = document.createElement('canvas');
+  cv.width = w * RATIO;
+  cv.height = h * RATIO;
+  const g = cv.getContext('2d')!;
+  g.scale(RATIO, RATIO);
+  g.drawImage(img, 0, 2, 40, 48);
+  if (done) {
+    g.fillStyle = GLYPH;
+    g.beginPath();
+    g.arc(34, 9, 9, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = DONE;
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(34, 9, 8, 0, Math.PI * 2);
+    g.stroke();
+    g.lineWidth = 2.4;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(30, 9.2);
+    g.lineTo(32.8, 12);
+    g.lineTo(38, 6.4);
+    g.stroke();
+  }
+  return g.getImageData(0, 0, cv.width, cv.height);
+}
+
+type FC = GeoJSON.FeatureCollection<GeoJSON.Point>;
+const EMPTY: FC = { type: 'FeatureCollection', features: [] };
+
+function pubFeature(p: Pub, done: boolean): GeoJSON.Feature<GeoJSON.Point> {
+  return { type: 'Feature', geometry: { type: 'Point', coordinates: [p.lon, p.lat] }, properties: { id: p.id, done } };
+}
 
 /**
- * Karte mit MapLibre. Pins und Sammel-Marker sind HTML-Buttons, damit VoiceOver sie vorliest
- * („Zum Anker, Kneipe, 120 Meter“) und die Tippfläche mindestens 44 pt groß ist.
+ * Karte mit MapLibre. Pins und Sammel-Marker sind Kartenebenen (WebGL), damit Verschieben und Zoomen flüssig
+ * bleiben. Für VoiceOver gibt es die Listenansicht mit denselben Orten.
  */
 export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
-  { pubs, collected, selectedId, onSelect, userPos, initialCenter, initialZoom = 15, onMapClick, onMove, label = 'Karte der Kneipen' },
+  { pubs, loadTile, dataVersion = 0, collected, selectedId, onSelect, userPos, initialCenter, initialZoom = 15, onMapClick, onMove, label = 'Karte der Kneipen' },
   ref
 ) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
-  const markers = useRef(new Map<string, maplibregl.Marker>());
   const me = useRef<maplibregl.Marker | null>(null);
-  const theme = useTheme();
+  const nameTag = useRef<maplibregl.Marker | null>(null);
+  const pin = useRef<HTMLImageElement | null>(null);
   const [offline, setOffline] = useState(false);
   const offlineRef = useRef(false);
-  const props = useRef({ pubs, collected, selectedId, onSelect, userPos, onMapClick, onMove, theme });
-  props.current = { pubs, collected, selectedId, onSelect, userPos, onMapClick, onMove, theme };
+  const tiled = !!loadTile;
+
+  // Daten, die beim Stilwechsel (Ersatzkarte) erhalten bleiben
+  const index = useRef(new Map<string, Pub>()); // alle bekannten Kneipen nach id
+  const detailIds = useRef(new Set<string>()); // Kneipen aus Zoom-13-Kacheln
+  const cache = useRef(new Map<string, PubTile | 'loading'>());
+  const cellsShown = useRef<FC>(EMPTY);
+  const props = useRef({ pubs, loadTile, collected, selectedId, onSelect, userPos, onMapClick, onMove });
+  props.current = { pubs, loadTile, collected, selectedId, onSelect, userPos, onMapClick, onMove };
 
   useImperativeHandle(ref, () => ({
     flyTo(pos, zoom) {
@@ -65,137 +148,147 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     },
   }));
 
-  function geojson(list: Pub[]): GeoJSON.FeatureCollection {
-    return {
-      type: 'FeatureCollection',
-      features: list.map((p) => ({ type: 'Feature', id: p.id, geometry: { type: 'Point', coordinates: [p.lon, p.lat] }, properties: { id: p.id } })),
-    };
-  }
+  const isDone = (id: string) => !!props.current.collected?.has(id);
 
-  function addPubSource(m: MlMap) {
-    if (m.getSource('pubs')) return;
-    m.addSource('pubs', { type: 'geojson', data: geojson(props.current.pubs), cluster: true, clusterRadius: 44, clusterMaxZoom: 17 });
-    // Unsichtbare Ebene, damit die Quelle gekachelt wird; sichtbar sind die HTML-Marker.
-    m.addLayer({ id: 'pubs-anchor', type: 'circle', source: 'pubs', paint: { 'circle-radius': 0, 'circle-opacity': 0 } });
-  }
-
-  function pinElement(p: Pub): HTMLElement {
-    const el = document.createElement('button');
-    el.className = 'mk mk-pin';
-    el.type = 'button';
-    const img = document.createElement('img');
-    img.alt = '';
-    el.appendChild(img);
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      props.current.onSelect?.(props.current.pubs.find((x) => x.id === p.id) ?? null);
+  function cellFeatures(cells: PubCell[]): GeoJSON.Feature<GeoJSON.Point>[] {
+    return cells.map((c) => {
+      if (c.count === 1 && c.pub) {
+        index.current.set(c.pub.id, c.pub);
+        return { ...pubFeature(c.pub, isDone(c.pub.id)), properties: { kind: 'pub', id: c.pub.id, done: isDone(c.pub.id) } };
+      }
+      return { type: 'Feature', geometry: { type: 'Point', coordinates: [c.lon, c.lat] }, properties: { kind: 'cell', count: c.count, label: clusterLabel(c.count) } };
     });
-    return el;
   }
 
-  function decoratePin(el: HTMLElement, p: Pub) {
-    const { selectedId, collected, userPos, theme } = props.current;
-    (el.firstChild as HTMLImageElement).src = theme === 'dark' ? markerDark : markerLight;
-    const sel = p.id === selectedId;
-    const done = !!collected?.has(p.id);
-    el.classList.toggle('is-selected', sel);
-    el.setAttribute('aria-pressed', String(sel));
-    const dist = userPos ? `, ${spokenDistance(distanceM(userPos, p))}` : '';
-    el.setAttribute('aria-label', `${p.name}, ${PUB_TYPE_LABEL[p.type]}${dist}${done ? ', schon gesammelt' : ''}`);
-    let badge = el.querySelector('.mk-done');
-    if (done && !badge) {
-      badge = document.createElement('span');
-      badge.className = 'mk-done';
-      badge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-      el.appendChild(badge);
-    } else if (!done && badge) badge.remove();
-    let lbl = el.querySelector('.mk-label');
-    if (sel && !lbl) {
-      lbl = document.createElement('span');
-      lbl.className = 'mk-label';
-      lbl.setAttribute('aria-hidden', 'true');
-      el.appendChild(lbl);
-    }
-    if (lbl) sel ? (lbl.textContent = p.name) : lbl.remove();
+  function source(id: string) {
+    return map.current?.getSource(id) as GeoJSONSource | undefined;
   }
 
-  function clusterElement(id: number, count: number, lngLat: [number, number]): HTMLElement {
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = 'mk mk-cluster';
-    const s = CLUSTER_SIZE(count);
-    el.style.width = el.style.height = `${s}px`;
-    el.textContent = count > 999 ? '999+' : String(count);
-    el.setAttribute('aria-label', `${count} Kneipen, zum Vergrößern doppeltippen`);
-    el.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const m = map.current!;
-      const zoom = await (m.getSource('pubs') as GeoJSONSource).getClusterExpansionZoom(id);
-      m.easeTo({ center: lngLat, zoom: Math.min(zoom + 0.5, 18), duration: 250 });
-    });
-    return el;
-  }
-
-  function syncMarkers() {
+  /** Daten in die Kartenquellen schreiben. Zählfelder wechseln erst, wenn alle Kacheln der Zoomstufe da sind. */
+  function push() {
     const m = map.current;
-    if (!m || !m.getSource('pubs') || !m.isSourceLoaded('pubs')) return;
-    const feats = m.querySourceFeatures('pubs');
-    const seen = new Set<string>();
-    const byId = new Map(props.current.pubs.map((p) => [p.id, p]));
-    for (const f of feats) {
-      const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
-      const pr = f.properties as Record<string, any>;
-      const key = pr.cluster ? `c-${pr.cluster_id}-${pr.point_count}` : `p-${pr.id}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      let mk = markers.current.get(key);
-      if (!mk) {
-        if (pr.cluster) {
-          mk = new maplibregl.Marker({ element: clusterElement(pr.cluster_id, pr.point_count, coords) }).setLngLat(coords);
-        } else {
-          const pub = byId.get(pr.id);
-          if (!pub) continue;
-          mk = new maplibregl.Marker({ element: pinElement(pub), anchor: 'bottom' }).setLngLat(coords);
+    if (!m || !m.getSource('pubs')) return;
+    if (!tiled) {
+      const list = props.current.pubs ?? [];
+      list.forEach((p) => index.current.set(p.id, p));
+      source('pubs')!.setData({ type: 'FeatureCollection', features: list.map((p) => pubFeature(p, isDone(p.id))) });
+    } else {
+      const ids = [...detailIds.current];
+      source('pubs')!.setData({ type: 'FeatureCollection', features: ids.map((id) => pubFeature(index.current.get(id)!, isDone(id))) });
+      const z = Math.floor(m.getZoom());
+      if (z < DETAIL_ZOOM) {
+        const b = m.getBounds();
+        const tiles = tilesFor({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, z, 1);
+        const parts = tiles.map(([tz, tx, ty]) => cache.current.get(`${tz}/${tx}/${ty}`));
+        if (parts.every((t) => t && t !== 'loading')) {
+          cellsShown.current = { type: 'FeatureCollection', features: (parts as PubTile[]).flatMap((t) => cellFeatures(t.cells ?? [])) };
         }
-        mk.addTo(m);
-        markers.current.set(key, mk);
       }
-      if (!pr.cluster) {
-        const pub = byId.get(pr.id);
-        if (pub) decoratePin(mk.getElement(), pub);
-        mk.getElement().style.zIndex = pr.id === props.current.selectedId ? '3' : '1';
-      }
+      source('cells')!.setData(cellsShown.current);
     }
-    for (const [key, mk] of markers.current) {
-      if (!seen.has(key)) {
-        mk.remove();
-        markers.current.delete(key);
-      }
+    const sel = props.current.selectedId ? index.current.get(props.current.selectedId) : undefined;
+    source('selected')!.setData(sel ? { type: 'FeatureCollection', features: [pubFeature(sel, isDone(sel.id))] } : EMPTY);
+  }
+
+  /** Fehlende Kacheln für den Ausschnitt nachladen; geladene bleiben im Speicher. */
+  function loadVisible() {
+    const m = map.current;
+    const load = props.current.loadTile;
+    if (!m || !load) return;
+    const z = Math.min(Math.floor(m.getZoom()), DETAIL_ZOOM);
+    const b = m.getBounds();
+    const tiles = tilesFor({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, z, 1);
+    if (tiles.length > 80) return;
+    let pending = 0;
+    for (const [tz, tx, ty] of tiles) {
+      const key = `${tz}/${tx}/${ty}`;
+      if (cache.current.has(key)) continue;
+      cache.current.set(key, 'loading');
+      pending++;
+      load(tz, tx, ty)
+        .then((t) => {
+          cache.current.set(key, t);
+          for (const p of t.pubs ?? []) {
+            index.current.set(p.id, p);
+            detailIds.current.add(p.id);
+          }
+        })
+        .catch(() => cache.current.delete(key))
+        .finally(() => {
+          pending--;
+          if (pending === 0 || tz >= DETAIL_ZOOM) push();
+        });
     }
+    if (!pending) push();
+  }
+
+  function addLayers(m: MlMap) {
+    if (pin.current && !m.hasImage('pin')) {
+      const a = pinImage(pin.current, false);
+      const b = pinImage(pin.current, true);
+      m.addImage('pin', a, { pixelRatio: RATIO });
+      m.addImage('pin-done', b, { pixelRatio: RATIO });
+    }
+    if (m.getSource('pubs')) return;
+    m.addSource('cells', { type: 'geojson', data: EMPTY });
+    m.addSource('pubs', { type: 'geojson', data: EMPTY, cluster: true, clusterRadius: 44, clusterMaxZoom: 16 });
+    m.addSource('selected', { type: 'geojson', data: EMPTY });
+    const pinLayout = {
+      'icon-image': ['case', ['get', 'done'], 'pin-done', 'pin'],
+      'icon-anchor': 'bottom',
+      'icon-offset': [2, 0],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+    } as const;
+    const clusterLayout = { 'icon-allow-overlap': true, 'icon-ignore-placement': true } as const;
+    const detailMin = tiled ? DETAIL_ZOOM : 0;
+    const layers: LayerSpecification[] = [
+      { id: 'cells-cluster', type: 'symbol', source: 'cells', maxzoom: DETAIL_ZOOM, filter: ['==', ['get', 'kind'], 'cell'], layout: { ...clusterLayout, 'icon-image': ['concat', 'cl-', ['get', 'label']] } },
+      { id: 'cells-pin', type: 'symbol', source: 'cells', maxzoom: DETAIL_ZOOM, filter: ['==', ['get', 'kind'], 'pub'], layout: pinLayout as any },
+      {
+        id: 'pubs-cluster', type: 'symbol', source: 'pubs', minzoom: detailMin, filter: ['has', 'point_count'],
+        layout: { ...clusterLayout, 'icon-image': ['concat', 'cl-', ['case', ['>', ['get', 'point_count'], 999], ['concat', ['to-string', ['floor', ['/', ['get', 'point_count'], 1000]]], 'k'], ['to-string', ['get', 'point_count']]]] },
+      },
+      { id: 'pubs-pin', type: 'symbol', source: 'pubs', minzoom: detailMin, filter: ['!', ['has', 'point_count']], layout: pinLayout as any },
+      { id: 'selected-pin', type: 'symbol', source: 'selected', layout: { ...(pinLayout as any), 'icon-size': 1.2 } },
+    ];
+    layers.forEach((l) => m.addLayer(l));
   }
 
   useEffect(() => {
     const start = initialCenter ?? props.current.userPos ?? { lat: 51.16, lon: 10.45 };
     const m = new maplibregl.Map({
       container: box.current!,
-      style: brandStyle(theme),
+      style: brandStyle(),
       center: [start.lon, start.lat],
       zoom: initialCenter || props.current.userPos ? initialZoom : 5,
       attributionControl: false,
       dragRotate: false,
       pitchWithRotate: false,
       maxZoom: 19,
+      fadeDuration: 0,
     });
     m.touchZoomRotate.disableRotation();
     map.current = m;
+
+    const img = new Image();
+    img.src = markerUrl;
+    img.decode().then(() => {
+      pin.current = img;
+      if (m.isStyleLoaded() && m.getSource('pubs')) {
+        m.addImage('pin', pinImage(img, false), { pixelRatio: RATIO });
+        m.addImage('pin-done', pinImage(img, true), { pixelRatio: RATIO });
+      }
+    });
+
     let tilesOk = false;
-    const failTimer = setTimeout(() => !tilesOk && goOffline(), 7000);
-    function goOffline() {
+    const goOffline = () => {
       if (tilesOk || !map.current || offlineRef.current) return;
       offlineRef.current = true;
       setOffline(true);
-      m.setStyle(fallbackStyle(props.current.theme));
-    }
+      m.setStyle(fallbackStyle(), { diff: false });
+    };
+    const failTimer = setTimeout(goOffline, 7000);
     m.on('sourcedata', (e) => {
       if (e.sourceId === 'omt' && e.isSourceLoaded) tilesOk = true;
     });
@@ -203,61 +296,87 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       const msg = String(e?.error?.message ?? '');
       if (!tilesOk && (e.sourceId === 'omt' || /openfreemap|tile|Failed to fetch|NetworkError/i.test(msg))) goOffline();
     });
-    m.on('style.load', () => {
-      if (offlineRef.current) m.setPaintProperty('land', 'background-opacity', 0);
-      addPubSource(m);
-      syncMarkers();
+    m.on('styleimagemissing', (e) => {
+      if (e.id.startsWith('cl-') && !m.hasImage(e.id)) m.addImage(e.id, clusterImage(e.id.slice(3)), { pixelRatio: RATIO });
     });
-    m.on('render', syncMarkers);
-    m.on('click', (e) => {
-      props.current.onSelect?.(null);
-      props.current.onMapClick?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
+    m.on('style.load', () => {
+      addLayers(m);
+      push();
+      loadVisible();
+    });
+
+    const hit = (pt: maplibregl.Point): MapGeoJSONFeature | undefined => {
+      const layers = LAYERS.filter((l) => m.getLayer(l));
+      const pad = 10; // größere Tippfläche als das sichtbare Symbol
+      return m.queryRenderedFeatures([[pt.x - pad, pt.y - pad], [pt.x + pad, pt.y + pad]], { layers })[0];
+    };
+    m.on('click', async (e) => {
+      const f = hit(e.point);
+      if (!f) {
+        props.current.onSelect?.(null);
+        props.current.onMapClick?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
+        return;
+      }
+      const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
+      const pr = f.properties as Record<string, any>;
+      if (pr.kind === 'cell') {
+        m.easeTo({ center: [lon, lat], zoom: Math.min(m.getZoom() + 2, DETAIL_ZOOM + 0.5), duration: 300 });
+      } else if (pr.point_count) {
+        const zoom = await (m.getSource('pubs') as GeoJSONSource).getClusterExpansionZoom(pr.cluster_id);
+        m.easeTo({ center: [lon, lat], zoom: Math.min(zoom + 0.3, 18), duration: 300 });
+      } else if (pr.id) {
+        props.current.onSelect?.(index.current.get(pr.id) ?? null);
+      }
+    });
+    m.on('mousemove', (e) => {
+      m.getCanvas().style.cursor = hit(e.point) ? 'pointer' : '';
     });
     m.on('moveend', () => {
+      loadVisible();
       const b = m.getBounds();
       const c = m.getCenter();
       props.current.onMove?.({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, { lat: c.lat, lon: c.lng });
     });
+
     return () => {
       clearTimeout(failTimer);
-      markers.current.forEach((mk) => mk.remove());
-      markers.current.clear();
+      nameTag.current?.remove();
+      me.current?.remove();
       m.remove();
       map.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Farbmodus gewechselt: Skin neu setzen (die Quelle der Kneipen kommt in style.load zurück)
+  // Feste Liste geändert oder gesammelte Kneipen geändert: neu zeichnen
+  useEffect(() => {
+    push();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pubs, collected, selectedId]);
+
+  // Kneipendaten auf dem Server geändert (z. B. neue Kneipe freigegeben): Kacheln neu laden
+  const firstVersion = useRef(dataVersion);
+  useEffect(() => {
+    if (dataVersion === firstVersion.current) return;
+    cache.current.clear();
+    detailIds.current.clear();
+    loadVisible();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataVersion]);
+
+  // Name der gewählten Kneipe über dem Pin (Auswahl hängt nie nur an Größe oder Farbe)
   useEffect(() => {
     const m = map.current;
-    if (!m || offline) return;
-    m.setStyle(brandStyle(theme));
-    markers.current.forEach((mk, key) => key.startsWith('p-') && mk.remove());
-    [...markers.current.keys()].filter((k) => k.startsWith('p-')).forEach((k) => markers.current.delete(k));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme]);
-
-  useEffect(() => {
-    if (offline && map.current?.getLayer('land')) map.current.setPaintProperty('land', 'background-opacity', 0);
-  }, [offline]);
-
-  useEffect(() => {
-    const src = map.current?.getSource('pubs') as GeoJSONSource | undefined;
-    src?.setData(geojson(pubs));
-  }, [pubs]);
-
-  useEffect(() => {
-    markers.current.forEach((mk, key) => {
-      if (!key.startsWith('p-')) return;
-      const pub = pubs.find((p) => `p-${p.id}` === key);
-      if (pub) {
-        decoratePin(mk.getElement(), pub);
-        mk.getElement().style.zIndex = pub.id === selectedId ? '3' : '1';
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, collected, userPos, theme]);
+    nameTag.current?.remove();
+    nameTag.current = null;
+    const sel = selectedId ? index.current.get(selectedId) : undefined;
+    if (!m || !sel) return;
+    const el = document.createElement('div');
+    el.className = 'mk-name';
+    el.textContent = sel.name;
+    el.setAttribute('aria-hidden', 'true');
+    nameTag.current = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -64] }).setLngLat([sel.lon, sel.lat]).addTo(m);
+  }, [selectedId]);
 
   useEffect(() => {
     const m = map.current;
@@ -278,7 +397,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
 
   return (
     <>
-      {offline && <div className="map-fallback" aria-hidden="true" />}
+      <div className="map-fallback" aria-hidden="true" />
       <div ref={box} className="map" role="region" aria-label={label} />
       <div className="map-attrib">© OpenStreetMap contributors{offline ? ' · Kartenbild offline' : ''}</div>
     </>

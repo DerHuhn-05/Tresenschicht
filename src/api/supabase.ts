@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { LatLon } from '../lib/geo';
 import type {
-  Api, Bounds, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, SignUpData, User,
+  Api, Bounds, PubTile, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, SignUpData, User,
 } from './types';
 
 // Echtes Backend (supabase/schema.sql). Alle Regeln prüft der Server; die App zeigt nur an.
@@ -176,6 +176,17 @@ export class SupabaseApi implements Api {
   async pubsInBounds(b: Bounds) {
     const rows = must(await this.sb.rpc('pubs_in_bbox', { w: b.west, s: b.south, e: b.east, n: b.north })) as Row[];
     return rows.map(toPub);
+  }
+
+  async pubTile(z: number, x: number, y: number): Promise<PubTile> {
+    const r = must(await this.sb.rpc('pub_tile', { p_z: z, p_x: x, p_y: y })) as Row;
+    if (r.pubs) return { pubs: (r.pubs as Row[]).map(toPub) };
+    return { cells: (r.cells as Row[]).map((c) => ({ count: c.count, lat: c.lat, lon: c.lon, pub: c.pub ? toPub(c.pub) : null })) };
+  }
+
+  async nearestPubs(pos: LatLon, limit = 100) {
+    const rows = must(await this.sb.rpc('pubs_nearest', { p_lat: pos.lat, p_lon: pos.lon, p_limit: limit })) as Row[];
+    return rows.map((r) => ({ ...toPub(r), distance: r.distance as number }));
   }
 
   async nearbyPubs(pos: LatLon, accuracy: number): Promise<NearbyResult> {

@@ -286,6 +286,11 @@ img {
   -webkit-appearance: none;
   appearance: none;
 }
+/* Auswahlliste: native Auswahl (auf dem iPhone das Auswahlrad), Pfeil rechts */
+.select { position: relative; }
+.select .input { padding-right: 48px; cursor: pointer; }
+.select svg { position: absolute; right: var(--space-4); top: 50%; transform: translateY(-50%); pointer-events: none; }
+.select option { background: var(--surface); color: var(--text); }
 textarea.input {
   min-height: 104px;
   resize: vertical;

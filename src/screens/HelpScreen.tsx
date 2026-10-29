@@ -73,13 +73,16 @@ export function HelpScreen() {
 
       <section className="section">
         <h2 className="t-h3 section-title">Schreib uns</h2>
-        <div className="chips" role="group" aria-label="Thema" style={{ marginBottom: 16 }}>
-          {TOPICS.map((t) => (
-            <button key={t} className="chip" aria-pressed={topic === t} onClick={() => setTopic(t)}>
-              {t}
-            </button>
-          ))}
-        </div>
+        <Field label="Thema">
+          {(id) => (
+            <div className="select">
+              <select id={id} className="input" value={topic} onChange={(e) => setTopic(e.target.value as (typeof TOPICS)[number])}>
+                {TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <Icon name="chevron-down" size={20} muted />
+            </div>
+          )}
+        </Field>
         <Field label="Deine Nachricht" hint="Beim Senden öffnet sich deine Mail-App mit dieser Nachricht.">
           {(id, d) => <textarea id={id} aria-describedby={d} className="input" value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={5} />}
         </Field>

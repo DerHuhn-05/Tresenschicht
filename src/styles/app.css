@@ -968,12 +968,13 @@ textarea.input {
 }
 .me-dot {
   /* eigener Standort: hell auf der Nachtblau-Karte, klar anders als die Bernstein-Pins */
-  width: 22px;
-  height: 22px;
+  width: 14px;
+  height: 14px;
   border-radius: var(--radius-full);
   background: var(--white);
-  border: 5px solid var(--navy-700);
-  box-shadow: 0 0 0 2px var(--white), 0 0 0 10px rgba(255, 255, 255, 0.14);
+  border: 3px solid var(--navy-700);
+  box-shadow: 0 0 0 2px var(--white);
+  pointer-events: none;
 }
 .accuracy-ring {
   border-radius: var(--radius-full);

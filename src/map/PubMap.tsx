@@ -1,11 +1,12 @@
 import maplibregl, { type GeoJSONSource, type LayerSpecification, type Map as MlMap, type MapGeoJSONFeature } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import type { Bounds, Pub, PubCell, PubTile } from '../api';
+import Supercluster from 'supercluster';
+import type { Bounds, CountryTotal, Pub, PubCell, PubTile } from '../api';
 import markerUrl from '../assets/pub-marker-dark.svg';
 import type { LatLon } from '../lib/geo';
 import { tokenColor } from '../lib/theme';
-import { DETAIL_ZOOM, tilesFor } from '../lib/tiles';
+import { COUNTRY_ZOOM, DETAIL_ZOOM, tilesFor } from '../lib/tiles';
 import { brandStyle, fallbackStyle } from './style';
 
 export interface PubMapHandle {
@@ -19,6 +20,8 @@ interface Props {
   pubs?: Pub[];
   /** Hauptkarte: Kneipen kachelweise vom Server (Zählfelder unter Zoom 13, einzelne Kneipen ab Zoom 13). */
   loadTile?: (z: number, x: number, y: number) => Promise<PubTile>;
+  /** Weit herausgezoomt: ein Kreis je Land */
+  loadCountries?: () => Promise<CountryTotal[]>;
   /** Steigt, wenn sich Kneipendaten geändert haben (dann wird neu geladen). */
   dataVersion?: number;
   collected?: Set<string>;
@@ -58,13 +61,19 @@ function slowDownZoom(m: MlMap) {
 }
 
 const LAYERS = ['cells-cluster', 'cells-pin', 'pubs-cluster', 'pubs-pin', 'selected-pin'];
-const clusterSize = (n: number) => (n < 10 ? 44 : n < 100 ? 52 : 60); // cluster-s, -m, -l
-const clusterLabel = (n: number) => (n > 999 ? `${Math.floor(n / 1000)}k` : String(n));
+// cluster-s, -m, -l aus dem Design System; ab 1.000 Kneipen (Länder, große Regionen) etwas größer
+const clusterSize = (n: number) => (n < 10 ? 44 : n < 100 ? 52 : n < 1000 ? 60 : 68);
+const clusterLabel = (n: number) =>
+  n < 1000 ? String(n) : n < 10000 ? `${(Math.floor(n / 100) / 10).toLocaleString('de-DE')}k` : `${Math.round(n / 1000)}k`;
+/** Abstand in Pixeln, ab dem Kreise verschmelzen: erst wenn sie sich überlappen würden */
+const MERGE_RADIUS = 48;
 
-/** Sammel-Marker als Bild mit Zahl: Bernstein-Kreis, Nachtblau-Ring und -Zahl. Braucht keine Kartenschrift. */
-function clusterImage(label: string) {
-  const n = label.endsWith('k') ? Number(label.slice(0, -1)) * 1000 : Number(label);
-  const s = clusterSize(n);
+/** Sammel-Marker als Bild mit Zahl: Bernstein-Kreis, Nachtblau-Ring und -Zahl. Braucht keine Kartenschrift.
+ *  Bild-Name: cl-<Größe>-<Zahl>, z. B. cl-68-28k. */
+function clusterImage(id: string) {
+  const [, size, ...rest] = id.split('-');
+  const s = Number(size) || 44;
+  const label = rest.join('-');
   const cv = document.createElement('canvas');
   cv.width = cv.height = s * RATIO;
   const g = cv.getContext('2d')!;
@@ -79,7 +88,7 @@ function clusterImage(label: string) {
   g.arc(s / 2, s / 2, s / 2 - 4.5, 0, Math.PI * 2);
   g.stroke();
   g.fillStyle = GLYPH;
-  g.font = `800 ${label.length > 3 ? 15 : 17}px -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif`;
+  g.font = `800 ${label.length > 3 ? 15 : s >= 68 ? 19 : 17}px -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(label, s / 2, s / 2 + 1);
@@ -130,12 +139,11 @@ function pubFeature(p: Pub, done: boolean): GeoJSON.Feature<GeoJSON.Point> {
  * bleiben. Für VoiceOver gibt es die Listenansicht mit denselben Orten.
  */
 export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
-  { pubs, loadTile, dataVersion = 0, collected, selectedId, onSelect, userPos, initialCenter, initialZoom = 15, onMapClick, onMove, label = 'Karte der Kneipen' },
+  { pubs, loadTile, loadCountries, dataVersion = 0, collected, selectedId, onSelect, userPos, initialCenter, initialZoom = 15, onMapClick, onMove, label = 'Karte der Kneipen' },
   ref
 ) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
-  const me = useRef<maplibregl.Marker | null>(null);
   const nameTag = useRef<maplibregl.Marker | null>(null);
   const pin = useRef<HTMLImageElement | null>(null);
   const [offline, setOffline] = useState(false);
@@ -147,8 +155,9 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
   const detailIds = useRef(new Set<string>()); // Kneipen aus Zoom-13-Kacheln
   const cache = useRef(new Map<string, PubTile | 'loading'>());
   const tries = useRef(new Map<string, number>());
-  const props = useRef({ pubs, loadTile, collected, selectedId, onSelect, userPos, onMapClick, onMove });
-  props.current = { pubs, loadTile, collected, selectedId, onSelect, userPos, onMapClick, onMove };
+  const countries = useRef<CountryTotal[] | 'loading' | null>(null);
+  const props = useRef({ pubs, loadTile, loadCountries, collected, selectedId, onSelect, userPos, onMapClick, onMove });
+  props.current = { pubs, loadTile, loadCountries, collected, selectedId, onSelect, userPos, onMapClick, onMove };
 
   useImperativeHandle(ref, () => ({
     flyTo(pos, zoom) {
@@ -169,13 +178,47 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
 
   const isDone = (id: string) => !!props.current.collected?.has(id);
 
-  function cellFeatures(cells: PubCell[]): GeoJSON.Feature<GeoJSON.Point>[] {
-    return cells.map((c) => {
-      if (c.count === 1 && c.pub) {
-        index.current.set(c.pub.id, c.pub);
-        return { ...pubFeature(c.pub, isDone(c.pub.id)), properties: { kind: 'pub', id: c.pub.id, done: isDone(c.pub.id) } };
+  function countFeature(count: number, lat: number, lon: number, extra: Record<string, unknown> = {}): GeoJSON.Feature<GeoJSON.Point> {
+    return {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [lon, lat] },
+      properties: { kind: 'cell', count, img: `cl-${clusterSize(count)}-${clusterLabel(count)}`, ...extra },
+    };
+  }
+
+  /**
+   * Feine Zählfelder des Servers nach echtem Abstand zusammenfassen. Jeder Kreis sitzt im Schwerpunkt seiner
+   * Kneipen (nach Anzahl gewichtet), nicht in einem Raster; Kreise verschmelzen erst bei Überlappung.
+   */
+  function clusterCells(cells: PubCell[], z: number): GeoJSON.Feature<GeoJSON.Point>[] {
+    type P = { n: number; la: number; lo: number; pub?: string };
+    const sc = new Supercluster<P, P>({
+      radius: MERGE_RADIUS,
+      minZoom: z,
+      maxZoom: z,
+      map: (p) => ({ n: p.n, la: p.la, lo: p.lo }),
+      reduce: (a, b) => {
+        a.n += b.n;
+        a.la += b.la;
+        a.lo += b.lo;
+      },
+    });
+    sc.load(
+      cells.map((c) => {
+        if (c.pub) index.current.set(c.pub.id, c.pub);
+        return {
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [c.lon, c.lat] },
+          properties: { n: c.count, la: c.lat * c.count, lo: c.lon * c.count, pub: c.count === 1 ? c.pub?.id : undefined },
+        };
+      })
+    );
+    return sc.getClusters([-180, -85, 180, 85], z).map((f) => {
+      const p = f.properties as P & { cluster?: boolean };
+      if (!p.cluster && p.n === 1 && p.pub) {
+        return { ...pubFeature(index.current.get(p.pub)!, isDone(p.pub)), properties: { kind: 'pub', id: p.pub, done: isDone(p.pub) } };
       }
-      return { type: 'Feature', geometry: { type: 'Point', coordinates: [c.lon, c.lat] }, properties: { kind: 'cell', count: c.count, label: clusterLabel(c.count) } };
+      return countFeature(p.n, p.la / p.n, p.lo / p.n);
     });
   }
 
@@ -195,15 +238,24 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       const ids = [...detailIds.current];
       source('pubs')!.setData({ type: 'FeatureCollection', features: ids.map((id) => pubFeature(index.current.get(id)!, isDone(id))) });
       const z = Math.floor(m.getZoom());
-      if (z < DETAIL_ZOOM) {
+      if (z < COUNTRY_ZOOM) {
+        // Letzte Stufe: ein Kreis je Land, in der Landesmitte
+        const list = Array.isArray(countries.current) ? countries.current : [];
+        source('cells')!.setData({ type: 'FeatureCollection', features: list.map((c) => countFeature(c.count, c.lat, c.lon, { country: c.code })) });
+      } else if (z < DETAIL_ZOOM) {
         const b = m.getBounds();
         const tiles = tilesFor({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, z, 1);
         const parts = tiles.map(([tz, tx, ty]) => cache.current.get(`${tz}/${tx}/${ty}`)).filter((t): t is PubTile => !!t && t !== 'loading');
-        source('cells')!.setData({ type: 'FeatureCollection', features: parts.flatMap((t) => cellFeatures(t.cells ?? [])) });
+        source('cells')!.setData({ type: 'FeatureCollection', features: clusterCells(parts.flatMap((t) => t.cells ?? []), z) });
       }
     }
     const sel = props.current.selectedId ? index.current.get(props.current.selectedId) : undefined;
     source('selected')!.setData(sel ? { type: 'FeatureCollection', features: [pubFeature(sel, isDone(sel.id))] } : EMPTY);
+  }
+
+  function pushMe() {
+    const u = props.current.userPos;
+    source('me')?.setData(u ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [u.lon, u.lat] }, properties: {} }] } : EMPTY);
   }
 
   /** Fehlende Kacheln für den Ausschnitt nachladen; geladene bleiben im Speicher. */
@@ -211,6 +263,17 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     const m = map.current;
     const load = props.current.loadTile;
     if (!m || !load) return;
+    if (Math.floor(m.getZoom()) < COUNTRY_ZOOM) {
+      const lc = props.current.loadCountries;
+      if (lc && countries.current === null) {
+        countries.current = 'loading';
+        lc()
+          .then((list) => ((countries.current = list), push()))
+          .catch(() => ((countries.current = null), setTimeout(loadVisible, 2000)));
+      }
+      push();
+      return;
+    }
     const z = Math.min(Math.floor(m.getZoom()), DETAIL_ZOOM);
     const b = m.getBounds();
     const tiles = tilesFor({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, z, 1);
@@ -258,8 +321,10 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     }
     if (m.getSource('pubs')) return;
     m.addSource('cells', { type: 'geojson', data: EMPTY });
-    m.addSource('pubs', { type: 'geojson', data: EMPTY, cluster: true, clusterRadius: 44, clusterMaxZoom: 16 });
+    // Nah dran: einzelne Pins verschmelzen nur, wenn sie sich überlappen; ab Zoom 16 immer einzeln
+    m.addSource('pubs', { type: 'geojson', data: EMPTY, cluster: true, clusterRadius: 40, clusterMaxZoom: 15 });
     m.addSource('selected', { type: 'geojson', data: EMPTY });
+    m.addSource('me', { type: 'geojson', data: EMPTY });
     const pinLayout = {
       'icon-image': ['case', ['get', 'done'], 'pin-done', 'pin'],
       'icon-anchor': 'bottom',
@@ -270,11 +335,22 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     const clusterLayout = { 'icon-allow-overlap': true, 'icon-ignore-placement': true } as const;
     const detailMin = tiled ? DETAIL_ZOOM : 0;
     const layers: LayerSpecification[] = [
-      { id: 'cells-cluster', type: 'symbol', source: 'cells', maxzoom: DETAIL_ZOOM, filter: ['==', ['get', 'kind'], 'cell'], layout: { ...clusterLayout, 'icon-image': ['concat', 'cl-', ['get', 'label']] } },
+      // eigener Standort zuerst, also unter allen Kneipen
+      { id: 'me-halo', type: 'circle', source: 'me', paint: { 'circle-radius': 11, 'circle-color': '#FFFFFF', 'circle-opacity': 0.18 } },
+      { id: 'me-dot', type: 'circle', source: 'me', paint: { 'circle-radius': 6, 'circle-color': '#FFFFFF', 'circle-stroke-width': 3, 'circle-stroke-color': tokenColor('navy-700', 'dark') } },
+      { id: 'cells-cluster', type: 'symbol', source: 'cells', maxzoom: DETAIL_ZOOM, filter: ['==', ['get', 'kind'], 'cell'], layout: { ...clusterLayout, 'icon-image': ['get', 'img'] } },
       { id: 'cells-pin', type: 'symbol', source: 'cells', maxzoom: DETAIL_ZOOM, filter: ['==', ['get', 'kind'], 'pub'], layout: pinLayout as any },
       {
         id: 'pubs-cluster', type: 'symbol', source: 'pubs', minzoom: detailMin, filter: ['has', 'point_count'],
-        layout: { ...clusterLayout, 'icon-image': ['concat', 'cl-', ['case', ['>', ['get', 'point_count'], 999], ['concat', ['to-string', ['floor', ['/', ['get', 'point_count'], 1000]]], 'k'], ['to-string', ['get', 'point_count']]]] },
+        layout: {
+          ...clusterLayout,
+          'icon-image': [
+            'concat', 'cl-',
+            ['case', ['<', ['get', 'point_count'], 10], '44', ['<', ['get', 'point_count'], 100], '52', ['<', ['get', 'point_count'], 1000], '60', '68'],
+            '-',
+            ['case', ['>', ['get', 'point_count'], 999], ['concat', ['to-string', ['round', ['/', ['get', 'point_count'], 1000]]], 'k'], ['to-string', ['get', 'point_count']]],
+          ],
+        },
       },
       { id: 'pubs-pin', type: 'symbol', source: 'pubs', minzoom: detailMin, filter: ['!', ['has', 'point_count']], layout: pinLayout as any },
       { id: 'selected-pin', type: 'symbol', source: 'selected', layout: { ...(pinLayout as any), 'icon-size': 1.2 } },
@@ -325,11 +401,12 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       if (!tilesOk && (e.sourceId === 'omt' || /openfreemap|tile|Failed to fetch|NetworkError/i.test(msg))) goOffline();
     });
     m.on('styleimagemissing', (e) => {
-      if (e.id.startsWith('cl-') && !m.hasImage(e.id)) m.addImage(e.id, clusterImage(e.id.slice(3)), { pixelRatio: RATIO });
+      if (e.id.startsWith('cl-') && !m.hasImage(e.id)) m.addImage(e.id, clusterImage(e.id), { pixelRatio: RATIO });
     });
     m.on('style.load', () => {
       addLayers(m);
       push();
+      pushMe();
       loadVisible();
     });
 
@@ -347,7 +424,9 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       }
       const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
       const pr = f.properties as Record<string, any>;
-      if (pr.kind === 'cell') {
+      if (pr.kind === 'cell' && pr.country) {
+        m.easeTo({ center: [lon, lat], zoom: COUNTRY_ZOOM + 0.6, duration: 400 });
+      } else if (pr.kind === 'cell') {
         m.easeTo({ center: [lon, lat], zoom: Math.min(m.getZoom() + 2, DETAIL_ZOOM + 0.5), duration: 300 });
       } else if (pr.point_count) {
         const zoom = await (m.getSource('pubs') as GeoJSONSource).getClusterExpansionZoom(pr.cluster_id);
@@ -369,7 +448,6 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     return () => {
       clearTimeout(failTimer);
       nameTag.current?.remove();
-      me.current?.remove();
       m.remove();
       map.current = null;
     };
@@ -388,6 +466,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     if (dataVersion === firstVersion.current) return;
     cache.current.clear();
     detailIds.current.clear();
+    countries.current = null;
     loadVisible();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataVersion]);
@@ -406,21 +485,10 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     nameTag.current = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -64] }).setLngLat([sel.lon, sel.lat]).addTo(m);
   }, [selectedId]);
 
+  // Eigener Standort als Kartenebene unter Pins und Kreisen, damit er keine Zahlen verdeckt
   useEffect(() => {
-    const m = map.current;
-    if (!m) return;
-    if (!userPos) {
-      me.current?.remove();
-      me.current = null;
-      return;
-    }
-    if (!me.current) {
-      const el = document.createElement('div');
-      el.className = 'me-dot';
-      el.setAttribute('role', 'img');
-      el.setAttribute('aria-label', 'Dein Standort');
-      me.current = new maplibregl.Marker({ element: el }).setLngLat([userPos.lon, userPos.lat]).addTo(m);
-    } else me.current.setLngLat([userPos.lon, userPos.lat]);
+    pushMe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userPos]);
 
   return (

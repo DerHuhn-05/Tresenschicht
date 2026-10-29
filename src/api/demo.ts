@@ -5,7 +5,7 @@ import { load, save } from '../lib/storage';
 import { CELLS_PER_TILE, DETAIL_ZOOM, latToTileY, lonToTileX } from '../lib/tiles';
 import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
 import type {
-  Api, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, User,
+  Api, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, User,
 } from './types';
 
 // Demo-Backend: dieselben Regeln wie der Server, Daten nur im Browser (localStorage).
@@ -49,6 +49,14 @@ interface Db {
 }
 
 const KEY = 'kneipen-demo-db';
+const COUNTRY_CENTERS: Record<string, { name: string; lat: number; lon: number }> = {
+  DE: { name: 'Deutschland', lat: 51.09, lon: 10.37 }, AT: { name: 'Österreich', lat: 47.59, lon: 14.13 },
+  CH: { name: 'Schweiz', lat: 46.8, lon: 8.22 }, FR: { name: 'Frankreich', lat: 46.62, lon: 2.45 },
+  BE: { name: 'Belgien', lat: 50.64, lon: 4.64 }, NL: { name: 'Niederlande', lat: 52.28, lon: 5.64 },
+  LU: { name: 'Luxemburg', lat: 49.77, lon: 6.07 }, DK: { name: 'Dänemark', lat: 56.23, lon: 9.37 },
+  PL: { name: 'Polen', lat: 52.12, lon: 19.39 }, CZ: { name: 'Tschechien', lat: 49.73, lon: 15.31 },
+  IT: { name: 'Italien', lat: 43.52, lon: 12.15 }, ES: { name: 'Spanien', lat: 40.39, lon: -3.56 },
+};
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
 
@@ -238,6 +246,16 @@ export class DemoApi implements Api {
           pub: ps.length === 1 ? ps[0] : null,
         })),
       },
+      60
+    );
+  }
+
+  // Landesmitten wie pub_countries() auf dem Server (Schwerpunkt der größten Landesfläche)
+  async countryTotals(): Promise<CountryTotal[]> {
+    const counts = new Map<string, number>();
+    for (const p of this.db.pubs) if (p.status === 'aktiv') counts.set(p.country, (counts.get(p.country) ?? 0) + 1);
+    return this.wait(
+      [...counts].filter(([code]) => COUNTRY_CENTERS[code]).map(([code, count]) => ({ code, count, ...COUNTRY_CENTERS[code] })),
       60
     );
   }

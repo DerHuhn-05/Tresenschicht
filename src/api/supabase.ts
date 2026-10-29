@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { LatLon } from '../lib/geo';
 import type {
-  Api, Bounds, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, SignUpData, User,
+  Api, Bounds, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, SignUpData, User,
 } from './types';
 
 // Echtes Backend (supabase/schema.sql). Alle Regeln prüft der Server; die App zeigt nur an.
@@ -183,6 +183,10 @@ export class SupabaseApi implements Api {
     const r = must(await this.sb.rpc('pub_tile', { p_z: z, p_x: x, p_y: y })) as Row;
     if (r.pubs) return { pubs: (r.pubs as Row[]).map(toPub) };
     return { cells: (r.cells as Row[]).map((c) => ({ count: c.count, lat: c.lat, lon: c.lon, pub: c.pub ? toPub(c.pub) : null })) };
+  }
+
+  async countryTotals(): Promise<CountryTotal[]> {
+    return must(await this.sb.rpc('pub_countries')) as CountryTotal[];
   }
 
   async nearestPubs(pos: LatLon, limit = 100) {

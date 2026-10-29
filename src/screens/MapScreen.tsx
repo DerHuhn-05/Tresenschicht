@@ -62,6 +62,7 @@ export function MapScreen() {
         <PubMap
           ref={mapRef}
           loadTile={(z, x, y) => api.pubTile(z, x, y)}
+          loadCountries={() => api.countryTotals()}
           dataVersion={app.version}
           collected={collected}
           selectedId={selected?.id}

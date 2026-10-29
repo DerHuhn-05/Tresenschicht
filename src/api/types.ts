@@ -156,6 +156,15 @@ export interface ReportItem {
   photoPath?: string;
 }
 
+/** Ein Kreis je Land beim weiten Herauszoomen */
+export interface CountryTotal {
+  code: string;
+  name: string;
+  count: number;
+  lat: number;
+  lon: number;
+}
+
 export interface Bounds {
   west: number;
   south: number;
@@ -183,6 +192,7 @@ export interface Api {
   // Kneipen (B, D)
   pubsInBounds(b: Bounds): Promise<Pub[]>;
   pubTile(z: number, x: number, y: number): Promise<PubTile>;
+  countryTotals(): Promise<CountryTotal[]>;
   nearestPubs(pos: LatLon, limit?: number): Promise<NearbyPub[]>;
   nearbyPubs(pos: LatLon, accuracy: number): Promise<NearbyResult>;
   searchPubs(query: string, features?: PubFeature[]): Promise<Pub[]>;

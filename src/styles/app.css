@@ -4,10 +4,18 @@
 *::after {
   box-sizing: border-box;
 }
+/* App-Hülle: Die Seite selbst scrollt und federt nie. Gescrollt wird nur innerhalb
+   eines Bildschirms (.screen, .sheet), und nur wenn sein Inhalt nicht hineinpasst. */
 html,
 body,
 #root {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body {
+  position: fixed;
+  inset: 0;
 }
 html {
   -webkit-text-size-adjust: 100%;
@@ -94,6 +102,7 @@ img {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: calc(env(safe-area-inset-top) + var(--space-5)) var(--space-5) var(--space-8);
   background: var(--bg);
@@ -590,6 +599,7 @@ textarea.input {
   position: relative;
   max-height: 88%;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-2) var(--space-5) calc(env(safe-area-inset-bottom) + var(--space-5));
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: var(--surface);
@@ -825,10 +835,15 @@ textarea.input {
 /* Willkommen */
 .welcome {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: calc(env(safe-area-inset-top) + var(--space-16)) var(--space-5) calc(env(safe-area-inset-bottom) + var(--space-5));
+  gap: var(--space-8);
+  /* passt auf jedes iPhone; scrollt nur bei sehr großer Schrift */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(env(safe-area-inset-top) + clamp(var(--space-6), 8vh, var(--space-16))) var(--space-5) calc(env(safe-area-inset-bottom) + var(--space-5));
   background: var(--brand);
   color: var(--white);
 }
@@ -851,9 +866,9 @@ textarea.input {
   color: var(--amber-300);
 }
 .welcome-mark {
-  width: 72px;
-  height: 72px;
-  margin-bottom: var(--space-8);
+  width: 64px;
+  height: 64px;
+  margin-bottom: clamp(var(--space-4), 4vh, var(--space-8));
   color: var(--white);
 }
 

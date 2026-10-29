@@ -6,7 +6,8 @@ import { Icon } from '../components/Icon';
 import { Avatar, Confirm, Empty, Page, Spinner } from '../components/ui';
 import { relativeTime } from '../lib/format';
 import { useApp } from '../state/app';
-import { cityCount, CollectionView, VisitCard } from './CollectionScreens';
+import { StatsPanel } from '../components/Stats';
+import { CollectionView, VisitCard } from './CollectionScreens';
 
 export function FriendsScreen() {
   const app = useApp();
@@ -197,11 +198,7 @@ export function UserProfile({ id }: { id: string }) {
         <>
           {!entries ? <Spinner /> : (
             <>
-              <div className="stats" style={{ margin: '24px 0' }}>
-                <div className="stat big"><div className="n">{entries.length}</div><div className="muted">Kneipen</div></div>
-                <div className="stat"><div className="n">{entries.reduce((n, e) => n + e.visits, 0)}</div><div className="muted">Besuche</div></div>
-                <div className="stat"><div className="n">{cityCount(entries)}</div><div className="muted">Städte</div></div>
-              </div>
+              <div style={{ margin: '24px 0' }}><StatsPanel entries={entries} /></div>
               {entries.length === 0 ? <p className="muted">@{p.username} hat noch keine Kneipe gesammelt.</p> : <CollectionView entries={entries} userId={p.id} own={false} />}
               <section className="section">
                 <h2 className="t-h3 section-title">Abzeichen</h2>

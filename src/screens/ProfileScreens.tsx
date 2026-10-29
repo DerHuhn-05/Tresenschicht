@@ -6,7 +6,8 @@ import { remove } from '../lib/storage';
 import { isDemo, useApp } from '../state/app';
 import { BadgeGrid } from '../components/Badges';
 import { badgesOf } from '../lib/badges';
-import { cityCount, VisitCard } from './CollectionScreens';
+import { StatsPanel, StatTile } from '../components/Stats';
+import { VisitCard } from './CollectionScreens';
 
 function Row({ icon, title, sub, onClick, danger }: { icon: IconName; title: string; sub?: string; onClick: () => void; danger?: boolean }) {
   return (
@@ -49,8 +50,6 @@ export function ProfileScreen() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3);
 
-  const countries = new Set(entries?.map((e) => e.pub.country)).size;
-  const visits = entries?.reduce((n, e) => n + e.visits, 0) ?? 0;
   const regular = entries?.slice().sort((a, b) => b.visits - a.visits)[0];
   const loc = app.location;
   const locText = loc.simulated ? 'Simuliert (Demo)' : { ok: 'Erlaubt, solange die App offen ist', asking: 'Wird abgefragt', denied: 'Nicht erlaubt', unavailable: 'Nicht verfügbar', off: 'Noch nicht erlaubt' }[loc.status];
@@ -67,15 +66,10 @@ export function ProfileScreen() {
 
       {!entries ? <Spinner /> : (
         <section className="section" style={{ marginTop: 24 }}>
-          <div className="stats">
-            <div className="stat big"><div className="n">{entries.length}</div><div className="muted">Kneipen</div></div>
-            <div className="stat"><div className="n">{visits}</div><div className="muted">Besuche</div></div>
-            <div className="stat"><div className="n">{cityCount(entries)}</div><div className="muted">Städte</div></div>
-            <div className="stat"><div className="n">{countries}</div><div className="muted">{countries === 1 ? 'Land' : 'Länder'}</div></div>
-          </div>
+          <StatsPanel entries={entries} />
           {regular && regular.visits > 1 && (
             <p className="muted t-secondary" style={{ marginTop: 12 }}>
-              Stammkneipe: <span className="accent-text" style={{ fontWeight: 600 }}>{regular.pub.name}</span> mit {regular.visits} Besuchen
+              Stammkneipe: <span className="accent-text" style={{ fontWeight: 600 }}>{regular.pub.name}</span> mit {regular.visits} Check-ins
             </p>
           )}
         </section>
@@ -84,9 +78,9 @@ export function ProfileScreen() {
       {entries && (
         <section className="section">
           <h2 className="t-h3 section-title">{year}</h2>
-          <div className="stats">
-            <div className="stat"><div className="n">{thisYear.newPubs}</div><div className="muted">{thisYear.newPubs === 1 ? 'neue Kneipe' : 'neue Kneipen'}</div></div>
-            <div className="stat"><div className="n">{thisYear.visits}</div><div className="muted">{thisYear.visits === 1 ? 'Besuch' : 'Besuche'}</div></div>
+          <div className="stats stats-2">
+            <StatTile icon="pub" n={thisYear.newPubs} label={thisYear.newPubs === 1 ? 'neue Kneipe' : 'neue Kneipen'} />
+            <StatTile icon="checkin" n={thisYear.visits} label={thisYear.visits === 1 ? 'Check-in' : 'Check-ins'} />
           </div>
           {topCities.length > 0 && (
             <ul className="list" style={{ marginTop: 12 }} aria-label="Meistbesuchte Städte">

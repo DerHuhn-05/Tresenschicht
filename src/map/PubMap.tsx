@@ -3,10 +3,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import Supercluster from 'supercluster';
 import type { Bounds, CountryTotal, Pub, PubCell, PubTile } from '../api';
-import markerUrl from '../assets/pub-marker-dark.svg';
 import type { LatLon } from '../lib/geo';
 import { tokenColor } from '../lib/theme';
-import { COUNTRY_ZOOM, DETAIL_ZOOM, tilesFor } from '../lib/tiles';
+import { COUNTRY_ZOOM, DETAIL_ZOOM, PIN_ZOOM, tilesFor } from '../lib/tiles';
 import { brandStyle, fallbackStyle } from './style';
 
 export interface PubMapHandle {
@@ -65,8 +64,9 @@ const LAYERS = ['cells-cluster', 'cells-pin', 'pubs-cluster', 'pubs-pin', 'selec
 const clusterSize = (n: number) => (n < 10 ? 44 : n < 100 ? 52 : n < 1000 ? 60 : 68);
 const clusterLabel = (n: number) =>
   n < 1000 ? String(n) : n < 10000 ? `${(Math.floor(n / 100) / 10).toLocaleString('de-DE')}k` : `${Math.round(n / 1000)}k`;
-/** Abstand in Pixeln, ab dem Kreise verschmelzen: erst wenn sie sich überlappen würden */
-const MERGE_RADIUS = 48;
+/** Abstand in Pixeln, ab dem Kreise verschmelzen. Weit draußen großzügig (ein Land bleibt ein, zwei Kreise
+ *  statt Nord und Süd), nah dran knapp (Kreise verschmelzen erst, wenn sie sich überlappen). */
+const mergeRadius = (z: number) => (z <= 6 ? 150 : z === 7 ? 120 : z === 8 ? 90 : z === 9 ? 66 : z === 10 ? 52 : 44);
 
 /** Sammel-Marker als Bild mit Zahl: Bernstein-Kreis, Nachtblau-Ring und -Zahl. Braucht keine Kartenschrift.
  *  Bild-Name: cl-<Größe>-<Zahl>, z. B. cl-68-28k. */
@@ -95,33 +95,63 @@ function clusterImage(id: string) {
   return g.getImageData(0, 0, cv.width, cv.height);
 }
 
-/** Pin aus dem Design System; „gesammelt“ bekommt einen Haken oben rechts (nicht nur Farbe). */
-function pinImage(img: HTMLImageElement, done: boolean) {
+const PIN_PATH = 'M20 0C9 0 0 8.6 0 19.4 0 33 20 48 20 48S40 33 40 19.4C40 8.6 31 0 20 0Z';
+const GLYPH_PATHS = [
+  'M3.5 9.5 5 4.5h14l1.5 5a2.83 2.83 0 0 1-5.67 0 2.83 2.83 0 0 1-5.66 0 2.83 2.83 0 0 1-5.67 0Z',
+  'M5 12.5v7h14v-7',
+  'M10 19.5v-3.5a2 2 0 0 1 4 0v3.5',
+];
+/** Noch nicht besucht: gedämpftes Blaugrau, damit besuchte Kneipen (Bernstein) herausstechen */
+const OPEN = tokenColor('navy-300', 'dark');
+const EDGE = tokenColor('navy-950', 'dark');
+
+/** Pin-Form aus dem Design System. Besucht: Bernstein mit Haken oben rechts (nicht nur Farbe),
+ *  noch nicht besucht: Blaugrau ohne Haken. Dunkler Rand, damit sich überlappende Pins trennen lassen. */
+function pinImage(done: boolean) {
   const w = 44;
-  const h = 50;
+  const h = 52;
   const cv = document.createElement('canvas');
   cv.width = w * RATIO;
   cv.height = h * RATIO;
   const g = cv.getContext('2d')!;
   g.scale(RATIO, RATIO);
-  g.drawImage(img, 0, 2, 40, 48);
+  g.translate(1, 3);
+  const pin = new Path2D(PIN_PATH);
+  g.fillStyle = done ? MARKER : OPEN;
+  g.fill(pin);
+  g.strokeStyle = EDGE;
+  g.lineWidth = 1.5;
+  g.stroke(pin);
+  g.save();
+  g.translate(8, 7);
+  g.strokeStyle = GLYPH;
+  g.fillStyle = GLYPH;
+  g.lineWidth = 2;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  GLYPH_PATHS.forEach((d, i) => {
+    const path = new Path2D(d);
+    if (i === 0) g.fill(path);
+    g.stroke(path);
+  });
+  g.restore();
   if (done) {
     g.fillStyle = GLYPH;
     g.beginPath();
-    g.arc(34, 9, 9, 0, Math.PI * 2);
+    g.arc(33, 6, 9, 0, Math.PI * 2);
     g.fill();
     g.strokeStyle = DONE;
     g.lineWidth = 2;
     g.beginPath();
-    g.arc(34, 9, 8, 0, Math.PI * 2);
+    g.arc(33, 6, 8, 0, Math.PI * 2);
     g.stroke();
     g.lineWidth = 2.4;
     g.lineCap = 'round';
     g.lineJoin = 'round';
     g.beginPath();
-    g.moveTo(30, 9.2);
-    g.lineTo(32.8, 12);
-    g.lineTo(38, 6.4);
+    g.moveTo(29, 6.2);
+    g.lineTo(31.8, 9);
+    g.lineTo(37, 3.4);
     g.stroke();
   }
   return g.getImageData(0, 0, cv.width, cv.height);
@@ -145,14 +175,13 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const nameTag = useRef<maplibregl.Marker | null>(null);
-  const pin = useRef<HTMLImageElement | null>(null);
   const [offline, setOffline] = useState(false);
   const offlineRef = useRef(false);
   const tiled = !!loadTile;
 
   // Daten, die beim Stilwechsel (Ersatzkarte) erhalten bleiben
   const index = useRef(new Map<string, Pub>()); // alle bekannten Kneipen nach id
-  const detailIds = useRef(new Set<string>()); // Kneipen aus Zoom-13-Kacheln
+  const detailIds = useRef(new Set<string>()); // Kneipen aus Zoom-13-Kacheln (ab PIN_ZOOM einzeln gezeigt)
   const cache = useRef(new Map<string, PubTile | 'loading'>());
   const tries = useRef(new Map<string, number>());
   const countries = useRef<CountryTotal[] | 'loading' | null>(null);
@@ -193,7 +222,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
   function clusterCells(cells: PubCell[], z: number): GeoJSON.Feature<GeoJSON.Point>[] {
     type P = { n: number; la: number; lo: number; pub?: string };
     const sc = new Supercluster<P, P>({
-      radius: MERGE_RADIUS,
+      radius: mergeRadius(z),
       minZoom: z,
       maxZoom: z,
       map: (p) => ({ n: p.n, la: p.la, lo: p.lo }),
@@ -242,7 +271,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
         // Letzte Stufe: ein Kreis je Land, in der Landesmitte
         const list = Array.isArray(countries.current) ? countries.current : [];
         source('cells')!.setData({ type: 'FeatureCollection', features: list.map((c) => countFeature(c.count, c.lat, c.lon, { country: c.code })) });
-      } else if (z < DETAIL_ZOOM) {
+      } else if (z < PIN_ZOOM) {
         const b = m.getBounds();
         const tiles = tilesFor({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, z, 1);
         const parts = tiles.map(([tz, tx, ty]) => cache.current.get(`${tz}/${tx}/${ty}`)).filter((t): t is PubTile => !!t && t !== 'loading');
@@ -274,7 +303,8 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       push();
       return;
     }
-    const z = Math.min(Math.floor(m.getZoom()), DETAIL_ZOOM);
+    // Ab PIN_ZOOM die Kacheln mit einzelnen Kneipen (Zoom 13) laden
+    const z = Math.floor(m.getZoom()) >= PIN_ZOOM ? DETAIL_ZOOM : Math.floor(m.getZoom());
     const b = m.getBounds();
     const tiles = tilesFor({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, z, 1);
     if (tiles.length > 80) return;
@@ -313,33 +343,36 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
   }
 
   function addLayers(m: MlMap) {
-    if (pin.current && !m.hasImage('pin')) {
-      const a = pinImage(pin.current, false);
-      const b = pinImage(pin.current, true);
-      m.addImage('pin', a, { pixelRatio: RATIO });
-      m.addImage('pin-done', b, { pixelRatio: RATIO });
+    if (!m.hasImage('pin')) {
+      m.addImage('pin', pinImage(false), { pixelRatio: RATIO });
+      m.addImage('pin-done', pinImage(true), { pixelRatio: RATIO });
     }
     if (m.getSource('pubs')) return;
     m.addSource('cells', { type: 'geojson', data: EMPTY });
-    // Nah dran: einzelne Pins verschmelzen nur, wenn sie sich überlappen; ab Zoom 16 immer einzeln
-    m.addSource('pubs', { type: 'geojson', data: EMPTY, cluster: true, clusterRadius: 40, clusterMaxZoom: 15 });
+    // Hauptkarte: ab PIN_ZOOM (Stadt) alle Kneipen einzeln, auch wenn sie sich überlappen.
+    // Feste Listen (z. B. Sammlung) fassen überlappende Pins bis Zoom 15 zusammen.
+    m.addSource('pubs', tiled ? { type: 'geojson', data: EMPTY } : { type: 'geojson', data: EMPTY, cluster: true, clusterRadius: 40, clusterMaxZoom: 15 });
     m.addSource('selected', { type: 'geojson', data: EMPTY });
     m.addSource('me', { type: 'geojson', data: EMPTY });
     const pinLayout = {
       'icon-image': ['case', ['get', 'done'], 'pin-done', 'pin'],
       'icon-anchor': 'bottom',
-      'icon-offset': [2, 0],
+      'icon-offset': [1, 3],
+      // in der Stadtansicht etwas kleiner, damit dichte Viertel lesbar bleiben
+      'icon-size': ['interpolate', ['linear'], ['zoom'], PIN_ZOOM, 0.72, 15, 1],
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
+      // besuchte Kneipen liegen oben
+      'symbol-sort-key': ['case', ['get', 'done'], 1, 0],
     } as const;
     const clusterLayout = { 'icon-allow-overlap': true, 'icon-ignore-placement': true } as const;
-    const detailMin = tiled ? DETAIL_ZOOM : 0;
+    const detailMin = tiled ? PIN_ZOOM : 0;
     const layers: LayerSpecification[] = [
       // eigener Standort zuerst, also unter allen Kneipen
       { id: 'me-halo', type: 'circle', source: 'me', paint: { 'circle-radius': 11, 'circle-color': '#FFFFFF', 'circle-opacity': 0.18 } },
       { id: 'me-dot', type: 'circle', source: 'me', paint: { 'circle-radius': 6, 'circle-color': '#FFFFFF', 'circle-stroke-width': 3, 'circle-stroke-color': tokenColor('navy-700', 'dark') } },
-      { id: 'cells-cluster', type: 'symbol', source: 'cells', maxzoom: DETAIL_ZOOM, filter: ['==', ['get', 'kind'], 'cell'], layout: { ...clusterLayout, 'icon-image': ['get', 'img'] } },
-      { id: 'cells-pin', type: 'symbol', source: 'cells', maxzoom: DETAIL_ZOOM, filter: ['==', ['get', 'kind'], 'pub'], layout: pinLayout as any },
+      { id: 'cells-cluster', type: 'symbol', source: 'cells', maxzoom: PIN_ZOOM, filter: ['==', ['get', 'kind'], 'cell'], layout: { ...clusterLayout, 'icon-image': ['get', 'img'] } },
+      { id: 'cells-pin', type: 'symbol', source: 'cells', maxzoom: PIN_ZOOM, filter: ['==', ['get', 'kind'], 'pub'], layout: pinLayout as any },
       {
         id: 'pubs-cluster', type: 'symbol', source: 'pubs', minzoom: detailMin, filter: ['has', 'point_count'],
         layout: {
@@ -353,7 +386,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
         },
       },
       { id: 'pubs-pin', type: 'symbol', source: 'pubs', minzoom: detailMin, filter: ['!', ['has', 'point_count']], layout: pinLayout as any },
-      { id: 'selected-pin', type: 'symbol', source: 'selected', layout: { ...(pinLayout as any), 'icon-size': 1.2 } },
+      { id: 'selected-pin', type: 'symbol', source: 'selected', layout: { ...(pinLayout as any), 'icon-size': 1.2, 'symbol-sort-key': 0 } },
     ];
     layers.forEach((l) => m.addLayer(l));
   }
@@ -374,16 +407,6 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     m.touchZoomRotate.disableRotation();
     slowDownZoom(m);
     map.current = m;
-
-    const img = new Image();
-    img.src = markerUrl;
-    img.decode().then(() => {
-      pin.current = img;
-      if (m.isStyleLoaded() && m.getSource('pubs')) {
-        m.addImage('pin', pinImage(img, false), { pixelRatio: RATIO });
-        m.addImage('pin-done', pinImage(img, true), { pixelRatio: RATIO });
-      }
-    });
 
     let tilesOk = false;
     const goOffline = () => {
@@ -427,7 +450,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       if (pr.kind === 'cell' && pr.country) {
         m.easeTo({ center: [lon, lat], zoom: COUNTRY_ZOOM + 0.6, duration: 400 });
       } else if (pr.kind === 'cell') {
-        m.easeTo({ center: [lon, lat], zoom: Math.min(m.getZoom() + 2, DETAIL_ZOOM + 0.5), duration: 300 });
+        m.easeTo({ center: [lon, lat], zoom: Math.min(m.getZoom() + 2, PIN_ZOOM + 0.5), duration: 300 });
       } else if (pr.point_count) {
         const zoom = await (m.getSource('pubs') as GeoJSONSource).getClusterExpansionZoom(pr.cluster_id);
         m.easeTo({ center: [lon, lat], zoom: Math.min(zoom + 0.3, 18), duration: 300 });

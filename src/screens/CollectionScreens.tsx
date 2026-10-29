@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type CheckIn, type CollectionEntry, type Pub } from '../api';
 import { Icon, type IconName } from '../components/Icon';
+import { StatsPanel } from '../components/Stats';
 import { Confirm, Empty, Field, Page, PhotoPicker, Spinner } from '../components/ui';
 import { formatDate, plural, relativeTime } from '../lib/format';
 import { PubMap, type PubMapHandle } from '../map/LazyMap';
@@ -18,10 +19,6 @@ export const DRINKS: { label: string; icon: IconName }[] = [
 
 export function drinkIcon(drink?: string): IconName {
   return DRINKS.find((d) => d.label === drink)?.icon ?? 'note';
-}
-
-export function cityCount(entries: CollectionEntry[]) {
-  return new Set(entries.map((e) => e.pub.city).filter(Boolean)).size;
 }
 
 /** Sammlung als Liste oder Karte; auch für Freunde (B2). */
@@ -54,7 +51,7 @@ export function CollectionView({ entries, userId, own }: { entries: CollectionEn
                 <div className="grow">
                   <div className="title">{e.pub.name}</div>
                   <div className="sub">
-                    {e.pub.city} · {plural(e.visits, 'Besuch', 'Besuche')} · {relativeTime(e.lastAt)}
+                    {e.pub.city} · {plural(e.visits, 'Check-in', 'Check-ins')} · {relativeTime(e.lastAt)}
                   </div>
                 </div>
                 <span className="chev"><Icon name="chevron-right" /></span>
@@ -77,7 +74,6 @@ export function CollectionScreen() {
     api.bookmarks().then(setSaved).catch(() => setSaved([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.version]);
-  const visits = entries?.reduce((n, e) => n + e.visits, 0) ?? 0;
   const visited = new Set(entries?.map((e) => e.pub.id));
 
   return (
@@ -115,11 +111,7 @@ export function CollectionScreen() {
         />
       ) : (
         <>
-          <div className="stats" style={{ marginBottom: 24 }}>
-            <div className="stat big"><div className="n">{entries.length}</div><div className="muted">{entries.length === 1 ? 'Kneipe' : 'Kneipen'}</div></div>
-            <div className="stat"><div className="n">{visits}</div><div className="muted">{visits === 1 ? 'Besuch' : 'Besuche'}</div></div>
-            <div className="stat"><div className="n">{cityCount(entries)}</div><div className="muted">{cityCount(entries) === 1 ? 'Stadt' : 'Städte'}</div></div>
-          </div>
+          <div style={{ marginBottom: 24 }}><StatsPanel entries={entries} /></div>
           <CollectionView entries={entries} own />
         </>
       )}

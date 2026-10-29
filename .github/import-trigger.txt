@@ -1,0 +1,2 @@
+Diese Datei ändern und pushen startet den OSM-Import (alle Länder).
+Letzter Anstoß: 2026-10-29, Raucherkneipen (smoking) nachladen

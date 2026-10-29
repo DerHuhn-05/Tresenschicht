@@ -1,5 +1,6 @@
 import type { CheckIn, CollectionEntry } from '../api';
 import type { IconName } from '../components/Icon';
+import { t } from './i18n';
 
 // Abzeichen für Meilensteine. Bewusst keine Abzeichen für getrunkene Menge (Anforderungsblatt, Problemfelder).
 export interface Badge {
@@ -50,7 +51,7 @@ const DEFS: { id: string; title: string; text: string; icon: IconName; goal: num
 
 export function badgesOf(entries: CollectionEntry[], checkins: CheckIn[] = []): Badge[] {
   const s = statsOf(entries, checkins);
-  return DEFS.map((d) => ({ id: d.id, title: d.title, text: d.text, icon: d.icon, goal: d.goal, value: Math.min(s[d.key], d.goal), earned: s[d.key] >= d.goal }));
+  return DEFS.map((d) => ({ id: d.id, title: t(d.title), text: t(d.text), icon: d.icon, goal: d.goal, value: Math.min(s[d.key], d.goal), earned: s[d.key] >= d.goal }));
 }
 
 /** Abzeichen, die zwischen zwei Ständen neu erreicht wurden (Meldung nach dem Check-in). */

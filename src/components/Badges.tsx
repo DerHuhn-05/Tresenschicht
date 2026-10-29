@@ -1,14 +1,15 @@
 import type { Badge } from '../lib/badges';
 import { Icon } from './Icon';
+import { t } from '../lib/i18n';
 
 /** Abzeichen als Kacheln: erreichte in Bernstein, offene gedämpft mit Fortschritt (nicht nur über Farbe). */
 export function BadgeGrid({ badges, onlyEarned = false }: { badges: Badge[]; onlyEarned?: boolean }) {
   const list = onlyEarned ? badges.filter((b) => b.earned) : badges;
-  if (!list.length) return <p className="muted">Noch keine Abzeichen.</p>;
+  if (!list.length) return <p className="muted">{t('Noch keine Abzeichen.')}</p>;
   return (
-    <ul className="badges" aria-label="Abzeichen">
+    <ul className="badges" aria-label={t('Abzeichen')}>
       {list.map((b) => (
-        <li key={b.id} className={`badge-tile${b.earned ? ' is-earned' : ''}`} aria-label={`${b.title}: ${b.text}. ${b.earned ? 'Erreicht' : `${b.value} von ${b.goal}`}`}>
+        <li key={b.id} className={`badge-tile${b.earned ? ' is-earned' : ''}`} aria-label={`${b.title}: ${b.text}. ${b.earned ? t('Erreicht') : t('{a} von {b}', { a: b.value, b: b.goal })}`}>
           <span className="badge-icon" aria-hidden="true">
             <Icon name={b.icon} size={24} muted={!b.earned} />
           </span>

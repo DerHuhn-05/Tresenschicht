@@ -7,6 +7,7 @@ import { PubMap, type PubMapHandle } from '../map/LazyMap';
 import { countdown, formatDistance, PUB_TYPE_LABEL } from '../lib/format';
 import { distanceM } from '../lib/geo';
 import { isDemo, useApp, useNow } from '../state/app';
+import { t } from '../lib/i18n';
 
 export function MapScreen() {
   const app = useApp();
@@ -75,7 +76,7 @@ export function MapScreen() {
               ? (pos) => {
                   app.simulate(pos);
                   setPlacing(false);
-                  app.notify('Standort gesetzt. Die App prüft jetzt, ob du in einer Kneipe bist.');
+                  app.notify(t('Standort gesetzt. Die App prüft jetzt, ob du in einer Kneipe bist.'));
                 }
               : undefined
           }
@@ -83,10 +84,10 @@ export function MapScreen() {
       ) : (
         <div className="screen subtle" style={{ position: 'absolute', inset: 0, paddingTop: 'calc(env(safe-area-inset-top) + 120px)' }}>
           <h1 className="t-h1" style={{ marginBottom: 16 }}>
-            In der Nähe
+            {t('In der Nähe')}
           </h1>
           {sortedList.length === 0 ? (
-            <p className="muted">Hier sind noch keine Kneipen eingetragen.</p>
+            <p className="muted">{t('Hier sind noch keine Kneipen eingetragen.')}</p>
           ) : (
             <ul className="list">
               {sortedList.map(({ p, d }) => (
@@ -97,7 +98,7 @@ export function MapScreen() {
                       <div className="title">{p.name}</div>
                       <div className="sub">
                         {PUB_TYPE_LABEL[p.type]} · {formatDistance(d)}
-                        {collected.has(p.id) ? ' · gesammelt' : ''}
+                        {collected.has(p.id) ? ` · ${t('gesammelt')}` : ''}
                       </div>
                     </div>
                     <span className="chev">
@@ -115,11 +116,11 @@ export function MapScreen() {
         <div className="row-gap" style={{ flexWrap: 'nowrap' }}>
           <button className="map-search" onClick={() => app.push({ kind: 'search' })}>
             <Icon name="search" />
-            <span>Kneipe oder Stadt suchen</span>
+            <span>{t('Kneipe oder Stadt suchen')}</span>
           </button>
           <button
             className="fab"
-            aria-label={view === 'map' ? 'Als Liste zeigen' : 'Als Karte zeigen'}
+            aria-label={view === 'map' ? t('Als Liste zeigen') : t('Als Karte zeigen')}
             onClick={() => {
               setSelected(null);
               setView(view === 'map' ? 'list' : 'map');
@@ -131,41 +132,41 @@ export function MapScreen() {
         {lockRemaining && (
           <button className="pill" onClick={() => setLockSheet(true)}>
             <Icon name="clock" size={20} />
-            Nächster Check-in in {lockRemaining}
+            {t('Nächster Check-in in {time}', { time: lockRemaining })}
           </button>
         )}
         {hint === 'accuracy' && (
           <Notice icon="warning">
-            Standort zu ungenau (± {Math.round(location.accuracy ?? 0)} m).{' '}
+            {t('Standort zu ungenau (± {n} m).', { n: Math.round(location.accuracy ?? 0) })}{' '}
             <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.requestLocation()}>
-              Noch einmal versuchen
+              {t('Noch einmal versuchen')}
             </button>
           </Notice>
         )}
-        {hint === 'area' && <Notice>Check-ins gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien. Die Karte kannst du überall ansehen.</Notice>}
+        {hint === 'area' && <Notice>{t('Check-ins gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien. Die Karte kannst du überall ansehen.')}</Notice>}
         {(location.status === 'denied' || location.status === 'unavailable') && !location.simulated && (
           <Notice icon="location-off">
-            Kein Standort. Öffne die Einstellungen und erlaube den Zugriff, während die App geöffnet ist.{' '}
+            {t('Kein Standort. Öffne die Einstellungen und erlaube den Zugriff, während die App geöffnet ist.')}{' '}
             <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.push({ kind: 'locationHelp' })}>
-              So geht’s
+              {t('So geht’s')}
             </button>
           </Notice>
         )}
         {location.status === 'asking' && !location.simulated && (
-          <Notice icon="location">Standort wird bestimmt … Erlaube den Zugriff, wenn dein iPhone fragt.</Notice>
+          <Notice icon="location">{t('Standort wird bestimmt … Erlaube den Zugriff, wenn dein iPhone fragt.')}</Notice>
         )}
         {location.status === 'off' && !location.simulated && (
           <Notice icon="location">
-            Für den Check-in braucht die App deinen Standort, nur solange sie offen ist.{' '}
+            {t('Für den Check-in braucht die App deinen Standort, nur solange sie offen ist.')}{' '}
             <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.requestLocation()}>
-              Standort erlauben
+              {t('Standort erlauben')}
             </button>
           </Notice>
         )}
         {isDemo && location.simulated && view === 'map' && (
           <div className="demo-bar">
-            <span>{placing ? 'Tippe auf die Karte, wo du stehst.' : 'Demo: Standort ist simuliert.'}</span>
-            <button onClick={() => setPlacing(!placing)}>{placing ? 'Abbrechen' : 'Standort setzen'}</button>
+            <span>{placing ? t('Tippe auf die Karte, wo du stehst.') : t('Demo: Standort ist simuliert.')}</span>
+            <button onClick={() => setPlacing(!placing)}>{placing ? t('Abbrechen') : t('Standort setzen')}</button>
             {!placing && (
               <button
                 onClick={() => {
@@ -175,7 +176,7 @@ export function MapScreen() {
                   mapRef.current?.flyTo(pos, 17);
                 }}
               >
-                Andere Kneipe
+                {t('Andere Kneipe')}
               </button>
             )}
           </div>
@@ -183,23 +184,23 @@ export function MapScreen() {
       </div>
 
       {selected && view === 'map' && (
-        <div className="preview-card" role="region" aria-label={`Kneipe ${selected.name}`}>
+        <div className="preview-card" role="region" aria-label={t('Kneipe {name}', { name: selected.name })}>
           <div className="row-between" style={{ alignItems: 'flex-start' }}>
             <div>
               <h2 className="t-h3">{selected.name}</h2>
               <p className="t-secondary muted">
                 {PUB_TYPE_LABEL[selected.type]}
                 {location.pos ? ` · ${formatDistance(distanceM(location.pos, selected))}` : ''}
-                {collected.has(selected.id) ? ' · gesammelt' : ''}
+                {collected.has(selected.id) ? ` · ${t('gesammelt')}` : ''}
               </p>
               <p className="t-secondary muted">{selected.address}</p>
             </div>
-            <button className="icon-btn" aria-label="Schließen" onClick={() => setSelected(null)}>
+            <button className="icon-btn" aria-label={t('Schließen')} onClick={() => setSelected(null)}>
               <Icon name="close" />
             </button>
           </div>
           <button className="btn btn-secondary btn-block" style={{ marginTop: 12 }} onClick={() => app.push({ kind: 'pub', id: selected.id })}>
-            Zur Kneipe
+            {t('Zur Kneipe')}
           </button>
         </div>
       )}
@@ -208,22 +209,22 @@ export function MapScreen() {
         <div className="map-bottom" style={{ bottom: 'calc(var(--tabbar-space) + 4px)' }}>
           <button className="fab" onClick={() => app.push({ kind: 'addPub', pos: location.pos ?? center })}>
             <Icon name="pin-add" />
-            Kneipe fehlt?
+            {t('Kneipe fehlt?')}
           </button>
-          <button className="fab" aria-label="Meinen Standort zeigen" onClick={locate}>
+          <button className="fab" aria-label={t('Meinen Standort zeigen')} onClick={locate}>
             <Icon name="location" />
           </button>
         </div>
       )}
 
       {lockSheet && lastCheckIn && (
-        <Sheet label="Letzter Check-in" onClose={() => setLockSheet(false)}>
+        <Sheet label={t('Letzter Check-in')} onClose={() => setLockSheet(false)}>
           <h2 className="t-h2" tabIndex={-1}>
-            Eingecheckt im {lastCheckIn.pub.name}
+            {t('Eingecheckt im {name}', { name: lastCheckIn.pub.name })}
           </h2>
           <p className="muted" style={{ margin: '8px 0 20px' }}>
-            {lockRemaining ? `Der nächste Check-in ist in ${lockRemaining} möglich. ` : ''}
-            Die Pause verhindert doppelte Einträge.
+            {lockRemaining ? `${t('Der nächste Check-in ist in {time} möglich.', { time: lockRemaining })} ` : ''}
+            {t('Die Pause verhindert doppelte Einträge.')}
           </p>
           <div className="btn-stack">
             <button
@@ -233,7 +234,7 @@ export function MapScreen() {
                 app.push({ kind: 'details', checkinId: lastCheckIn.id });
               }}
             >
-              Details hinzufügen
+              {t('Details hinzufügen')}
             </button>
             {lockRemaining && (
               <button
@@ -244,13 +245,13 @@ export function MapScreen() {
                     app.setLastCheckIn(null);
                     app.bump();
                     setLockSheet(false);
-                    app.notify('Check-in zurückgenommen. Du kannst jetzt die richtige Kneipe wählen.', 'success');
+                    app.notify(t('Check-in zurückgenommen. Du kannst jetzt die richtige Kneipe wählen.'), 'success');
                   } catch (e) {
                     app.notify((e as Error).message, 'error');
                   }
                 }}
               >
-                Falsche Kneipe? Zurücknehmen
+                {t('Falsche Kneipe? Zurücknehmen')}
               </button>
             )}
           </div>

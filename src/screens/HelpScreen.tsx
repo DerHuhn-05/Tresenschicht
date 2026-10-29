@@ -3,10 +3,11 @@ import { Icon } from '../components/Icon';
 import { Field, Notice, Page } from '../components/ui';
 import { OPERATOR } from '../lib/legal';
 import { useApp } from '../state/app';
+import { LANG, t } from '../lib/i18n';
 
 const TOPICS = ['Frage', 'Problem melden', 'Kneipe oder Daten falsch', 'Datenschutz', 'Sonstiges'] as const;
 
-const FAQ: { q: string; a: string }[] = [
+const FAQ: { q: string; a: string }[] = ([
   {
     q: 'Der Check-in klappt nicht',
     a: 'Die App braucht deinen Standort, solange sie offen ist. Prüfe unter Profil → Standort, ob er erlaubt ist. Drinnen ist GPS manchmal ungenau: kurz ans Fenster oder vor die Tür gehen hilft.',
@@ -23,7 +24,7 @@ const FAQ: { q: string; a: string }[] = [
     q: 'Wie lösche ich mein Konto?',
     a: 'Unter Profil ganz unten „Konto löschen“. Profil, Sammlung, Check-ins, Fotos und Freundschaften werden dann gelöscht.',
   },
-];
+]).map((f) => ({ q: t(f.q), a: t(f.a) }));
 
 /** Hilfe: häufige Fragen und Kontakt per E-Mail. Die Mail öffnet sich vorausgefüllt in der Mail-App. */
 export function HelpScreen() {
@@ -38,6 +39,7 @@ export function HelpScreen() {
       '',
       '—',
       app.user ? `Nutzername: @${app.user.username}` : 'Nicht angemeldet',
+      `Sprache: ${LANG}`,
       `Gerät: ${navigator.userAgent}`,
     ].join('\n');
     return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${text.trim()}\n${footer}`)}`;
@@ -46,18 +48,18 @@ export function HelpScreen() {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(email);
-      app.notify('E-Mail-Adresse kopiert', 'success');
+      app.notify(t('E-Mail-Adresse kopiert'), 'success');
     } catch {
       app.notify(email);
     }
   };
 
   return (
-    <Page onBack={app.pop} title="Hilfe und Kontakt">
-      <h1 className="t-h2" style={{ marginBottom: 16 }}>Hilfe und Kontakt</h1>
+    <Page onBack={app.pop} title={t('Hilfe und Kontakt')}>
+      <h1 className="t-h2" style={{ marginBottom: 16 }}>{t('Hilfe und Kontakt')}</h1>
 
       <section className="section">
-        <h2 className="t-h3 section-title">Häufige Fragen</h2>
+        <h2 className="t-h3 section-title">{t('Häufige Fragen')}</h2>
         <div className="faq">
           {FAQ.map((f) => (
             <details key={f.q}>
@@ -72,18 +74,18 @@ export function HelpScreen() {
       </section>
 
       <section className="section">
-        <h2 className="t-h3 section-title">Schreib uns</h2>
-        <Field label="Thema">
+        <h2 className="t-h3 section-title">{t('Schreib uns')}</h2>
+        <Field label={t('Thema')}>
           {(id) => (
             <div className="select">
               <select id={id} className="input" value={topic} onChange={(e) => setTopic(e.target.value as (typeof TOPICS)[number])}>
-                {TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
+                {TOPICS.map((topicDe) => <option key={topicDe} value={topicDe}>{t(topicDe)}</option>)}
               </select>
               <Icon name="chevron-down" size={20} muted />
             </div>
           )}
         </Field>
-        <Field label="Deine Nachricht" hint="Beim Senden öffnet sich deine Mail-App mit dieser Nachricht.">
+        <Field label={t('Deine Nachricht')} hint={t('Beim Senden öffnet sich deine Mail-App mit dieser Nachricht.')}>
           {(id, d) => <textarea id={id} aria-describedby={d} className="input" value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={5} />}
         </Field>
         <a
@@ -92,15 +94,15 @@ export function HelpScreen() {
           aria-disabled={!text.trim()}
           style={{ marginTop: 8 }}
         >
-          <Icon name="mail" size={20} /> E-Mail schreiben
+          <Icon name="mail" size={20} /> {t('E-Mail schreiben')}
         </a>
         <div style={{ marginTop: 16 }}>
           <Notice icon="info">
-            Du bekommst sofort eine automatische Bestätigung. Wir antworten in der Regel innerhalb weniger Tage.
+            {t('Du bekommst sofort eine automatische Bestätigung. Wir antworten in der Regel innerhalb weniger Tage.')}
           </Notice>
         </div>
         <button className="btn btn-text btn-block" style={{ marginTop: 8 }} onClick={copy}>
-          {email} kopieren
+          {t('{email} kopieren', { email })}
         </button>
       </section>
     </Page>

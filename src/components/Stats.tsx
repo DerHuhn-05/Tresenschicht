@@ -1,12 +1,13 @@
 import type { CollectionEntry } from '../api';
 import { Icon, type IconName } from './Icon';
+import { LOCALE, t } from '../lib/i18n';
 
 /** Eine Kachel: Icon, Zahl, Bezeichnung. Alle Kacheln einer Reihe sind gleich groß. */
 export function StatTile({ icon, n, label }: { icon: IconName; n: number; label: string }) {
   return (
     <div className="stat">
       <Icon name={icon} size={20} />
-      <div className="n">{n.toLocaleString('de-DE')}</div>
+      <div className="n">{n.toLocaleString(LOCALE)}</div>
       <div className="muted t-secondary">{label}</div>
     </div>
   );
@@ -26,14 +27,14 @@ export function StatsPanel({ entries }: { entries: CollectionEntry[] }) {
       <div className="stat-hero">
         <span className="stat-hero-icon" aria-hidden="true"><Icon name="pub" size={28} /></span>
         <div>
-          <div className="n">{pubs.toLocaleString('de-DE')}</div>
-          <div className="t-secondary">{pubs === 1 ? 'Kneipe gesammelt' : 'Kneipen gesammelt'}</div>
+          <div className="n">{pubs.toLocaleString(LOCALE)}</div>
+          <div className="t-secondary">{t(pubs === 1 ? 'Kneipe gesammelt' : 'Kneipen gesammelt')}</div>
         </div>
       </div>
       <div className="stats stats-3">
-        <StatTile icon="checkin" n={checkins} label={checkins === 1 ? 'Check-in' : 'Check-ins'} />
-        <StatTile icon="city" n={cities} label={cities === 1 ? 'Stadt' : 'Städte'} />
-        <StatTile icon="countries" n={countries} label={countries === 1 ? 'Land' : 'Länder'} />
+        <StatTile icon="checkin" n={checkins} label={t(checkins === 1 ? 'Check-in' : 'Check-ins')} />
+        <StatTile icon="city" n={cities} label={t(cities === 1 ? 'Stadt' : 'Städte')} />
+        <StatTile icon="countries" n={countries} label={t(countries === 1 ? 'Land' : 'Länder')} />
       </div>
     </div>
   );

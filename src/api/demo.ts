@@ -7,6 +7,7 @@ import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
 import type {
   Api, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, User,
 } from './types';
+import { t } from '../lib/i18n';
 
 // Demo-Backend: dieselben Regeln wie der Server, Daten nur im Browser (localStorage).
 interface DbUser extends User {
@@ -107,7 +108,7 @@ export class DemoApi implements Api {
   }
   private me(): DbUser {
     const u = this.db.users.find((x) => x.id === this.db.session);
-    if (!u) throw new Error('Du bist nicht angemeldet.');
+    if (!u) throw new Error(t('Du bist nicht angemeldet.'));
     return u;
   }
   private publicUser(u: DbUser): User {
@@ -148,8 +149,8 @@ export class DemoApi implements Api {
   }
 
   async signUp(d: Parameters<Api['signUp']>[0]) {
-    if (!(await this.isUsernameFree(d.username))) throw new Error('Dieser Benutzername ist schon vergeben.');
-    if (this.db.users.some((u) => u.email.toLowerCase() === d.email.toLowerCase())) throw new Error('Für diese E-Mail gibt es schon ein Konto.');
+    if (!(await this.isUsernameFree(d.username))) throw new Error(t('Dieser Benutzername ist schon vergeben.'));
+    if (this.db.users.some((u) => u.email.toLowerCase() === d.email.toLowerCase())) throw new Error(t('Für diese E-Mail gibt es schon ein Konto.'));
     const user: DbUser = {
       id: uid(), username: d.username, firstName: d.firstName, lastName: d.lastName, birthDate: d.birthDate,
       city: d.city, email: d.email, password: d.password, isAdmin: true,
@@ -169,7 +170,7 @@ export class DemoApi implements Api {
 
   async signIn(email: string, password: string) {
     const u = this.db.users.find((x) => x.email.toLowerCase() === email.toLowerCase() && x.password === password);
-    if (!u) throw new Error('E-Mail oder Passwort stimmt nicht.');
+    if (!u) throw new Error(t('E-Mail oder Passwort stimmt nicht.'));
     this.db.session = u.id;
     this.commit();
     return this.wait(this.publicUser(u));
@@ -195,7 +196,7 @@ export class DemoApi implements Api {
 
   async resetPasswordWithCode(email: string, _code: string, password: string) {
     const u = this.db.users.find((x) => x.email.toLowerCase() === email.toLowerCase());
-    if (!u) throw new Error('Der Code stimmt nicht oder ist abgelaufen. Fordere einen neuen an.');
+    if (!u) throw new Error(t('Der Code stimmt nicht oder ist abgelaufen. Fordere einen neuen an.'));
     u.password = password;
     this.db.session = u.id;
     this.commit();
@@ -219,7 +220,7 @@ export class DemoApi implements Api {
     const me = this.me();
     const { avatar, ...rest } = patch;
     if (rest.username && rest.username.toLowerCase() !== me.username.toLowerCase() && !(await this.isUsernameFree(rest.username))) {
-      throw new Error('Dieser Benutzername ist schon vergeben.');
+      throw new Error(t('Dieser Benutzername ist schon vergeben.'));
     }
     Object.assign(me, rest);
     if (avatar) me.avatarUrl = await blobToDataUrl(avatar);
@@ -319,7 +320,7 @@ export class DemoApi implements Api {
 
   async proposePub(p: Parameters<Api['proposePub']>[0]): Promise<CheckInResult | null> {
     const { photo, checkIn, ...rest } = p;
-    if (!inWorkArea(p)) throw new Error('Kneipen gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien.');
+    if (!inWorkArea(p)) throw new Error(t('Kneipen gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien.'));
     // wie auf dem Server: sofort angelegt, aber erst nach der Prüfung für alle sichtbar
     const pub: Pub = { id: uid(), name: p.name, type: p.type, lat: p.lat, lon: p.lon, address: p.address, city: p.city, country: 'DE', status: 'zu_pruefen', source: 'nutzer' };
     this.db.pubs.push(pub);
@@ -393,11 +394,11 @@ export class DemoApi implements Api {
   }
 
   async reviewByLink(): Promise<ReviewLinkEdit> {
-    throw new Error('Die Prüfung per E-Mail gibt es nur mit dem echten Server.');
+    throw new Error(t('Die Prüfung per E-Mail gibt es nur mit dem echten Server.'));
   }
 
   async decideByLink() {
-    throw new Error('Die Prüfung per E-Mail gibt es nur mit dem echten Server.');
+    throw new Error(t('Die Prüfung per E-Mail gibt es nur mit dem echten Server.'));
   }
 
   // Check-in: dieselben Prüfungen wie die Funktion check_in() auf dem Server
@@ -431,14 +432,14 @@ export class DemoApi implements Api {
   async undoCheckIn(id: string) {
     const c = this.db.checkins.find((x) => x.id === id && x.userId === this.me().id);
     if (!c) return;
-    if (Date.now() - Date.parse(c.at) > LOCK_MINUTES * 60_000) throw new Error('Zurücknehmen geht nur in den ersten 5 Minuten. Du kannst den Besuch löschen.');
+    if (Date.now() - Date.parse(c.at) > LOCK_MINUTES * 60_000) throw new Error(t('Zurücknehmen geht nur in den ersten 5 Minuten. Du kannst den Besuch löschen.'));
     this.db.checkins = this.db.checkins.filter((x) => x.id !== id);
     this.commit();
   }
 
   async saveDetails(checkinId: string, details: Omit<CheckInDetails, 'photoUrl'>, photo?: Blob | null) {
     const c = this.db.checkins.find((x) => x.id === checkinId && x.userId === this.me().id);
-    if (!c) throw new Error('Diesen Besuch gibt es nicht mehr.');
+    if (!c) throw new Error(t('Diesen Besuch gibt es nicht mehr.'));
     const photoUrl = photo === null ? undefined : photo ? await blobToDataUrl(photo) : c.details?.photoUrl;
     c.details = { ...details, photoUrl };
     this.commit();
@@ -496,7 +497,7 @@ export class DemoApi implements Api {
 
   async sendFriendRequest(userId: string) {
     const me = this.me().id;
-    if (this.blockedBetween(me, userId)) throw new Error('Anfrage nicht möglich.');
+    if (this.blockedBetween(me, userId)) throw new Error(t('Anfrage nicht möglich.'));
     const r = this.relation(me, userId);
     if (r && r.from === userId && r.status === 'angefragt') r.status = 'angenommen';
     else if (!r) this.db.friendships.push({ from: me, to: userId, status: 'angefragt', at: new Date().toISOString() });
@@ -583,7 +584,7 @@ export class DemoApi implements Api {
   }
 
   async reportQueue(): Promise<ReportItem[]> {
-    if (!this.me().isAdmin) throw new Error('Nur für die Prüfung freigeschaltete Konten.');
+    if (!this.me().isAdmin) throw new Error(t('Nur für die Prüfung freigeschaltete Konten.'));
     return this.wait(
       this.db.reports
         .filter((r) => (r.status ?? 'offen') === 'offen' && this.db.checkins.some((c) => c.id === r.checkinId))

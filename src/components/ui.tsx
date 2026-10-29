@@ -2,12 +2,13 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { shrinkPhoto } from '../lib/image';
 import { Icon, type IconName } from './Icon';
+import { t } from '../lib/i18n';
 
 export function TopBar({ title, onBack, right }: { title?: string; onBack?: () => void; right?: ReactNode }) {
   return (
     <header className="topbar">
       {onBack && (
-        <button className="icon-btn" onClick={onBack} aria-label="Zurück">
+        <button className="icon-btn" onClick={onBack} aria-label={t('Zurück')}>
           <Icon name="chevron-left" />
         </button>
       )}
@@ -59,7 +60,7 @@ export function Sheet({ children, onClose, label, closable = true }: { children:
       <div className="sheet" ref={ref} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
         <div className="grip" aria-hidden="true" />
         {closable && onClose && (
-          <button className="icon-btn sheet-close" onClick={onClose} aria-label="Schließen">
+          <button className="icon-btn sheet-close" onClick={onClose} aria-label={t('Schließen')}>
             <Icon name="close" />
           </button>
         )}
@@ -95,15 +96,15 @@ export function Field({
 
 export function Avatar({ url, name, size = 'md' }: { url?: string; name: string; size?: 'sm' | 'md' | 'lg' }) {
   const cls = `avatar${size === 'md' ? '' : ` ${size}`}`;
-  if (url) return <img className={cls} src={url} alt={`Profilbild von ${name}`} />;
+  if (url) return <img className={cls} src={url} alt={t('Profilbild von {name}', { name })} />;
   return (
-    <span className={cls} role="img" aria-label={`Profilbild von ${name}`}>
+    <span className={cls} role="img" aria-label={t('Profilbild von {name}', { name })}>
       <Icon name="profile" size={size === 'lg' ? 48 : 24} />
     </span>
   );
 }
 
-export function Spinner({ label = 'Lädt' }: { label?: string }) {
+export function Spinner({ label = t('Lädt') }: { label?: string }) {
   return (
     <div className="center" role="status">
       <div className="spinner" aria-hidden="true" />
@@ -134,7 +135,7 @@ export function Notice({ icon = 'info', children }: { icon?: IconName; children:
 
 /** Foto wählen oder aufnehmen; verkleinert auf dem Gerät (G3) und entfernt dabei die GPS-Daten. */
 export function PhotoPicker({
-  value, onChange, label = 'Foto hinzufügen', round = false,
+  value, onChange, label = t('Foto hinzufügen'), round = false,
 }: { value?: string; onChange: (blob: Blob | null, preview: string | null) => void; label?: string; round?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -147,14 +148,14 @@ export function PhotoPicker({
       const blob = await shrinkPhoto(file, round ? 600 : undefined);
       onChange(blob, URL.createObjectURL(blob));
     } catch {
-      setError('Dieses Foto lässt sich nicht öffnen. Wähle ein anderes.');
+      setError(t('Dieses Foto lässt sich nicht öffnen. Wähle ein anderes.'));
     } finally {
       setBusy(false);
     }
   }
   return (
     <div>
-      <button type="button" className={`photo-pick${round ? ' avatar-pick' : ''}`} onClick={() => input.current?.click()} aria-label={value ? `${label}: Foto ändern` : label}>
+      <button type="button" className={`photo-pick${round ? ' avatar-pick' : ''}`} onClick={() => input.current?.click()} aria-label={value ? `${label}: ${t('Foto ändern')}` : label}>
         {busy ? <div className="spinner" /> : value ? <img src={value} alt="" /> : (
           <>
             <Icon name={round ? 'profile' : 'camera'} size={32} />
@@ -165,7 +166,7 @@ export function PhotoPicker({
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
       {value && (
         <button type="button" className="btn btn-text" onClick={() => onChange(null, null)}>
-          Foto entfernen
+          {t('Foto entfernen')}
         </button>
       )}
       {error && (
@@ -180,8 +181,8 @@ export function PhotoPicker({
 
 export function Toast({ text, kind, onDone }: { text: string; kind: 'info' | 'success' | 'error'; onDone: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onDone, 4200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(onDone, 4200);
+    return () => clearTimeout(timer);
   }, [text, onDone]);
   return (
     <div className="toast" role={kind === 'error' ? 'alert' : 'status'}>
@@ -207,7 +208,7 @@ export function Confirm({
           {confirm}
         </button>
         <button className="btn btn-block btn-text" onClick={onCancel}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </Sheet>

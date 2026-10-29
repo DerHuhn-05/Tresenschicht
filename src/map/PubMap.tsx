@@ -7,6 +7,7 @@ import type { LatLon } from '../lib/geo';
 import { tokenColor } from '../lib/theme';
 import { COUNTRY_ZOOM, DETAIL_ZOOM, PIN_ZOOM, tilesFor } from '../lib/tiles';
 import { brandStyle, fallbackStyle } from './style';
+import { LOCALE, t } from '../lib/i18n';
 
 export interface PubMapHandle {
   flyTo(pos: LatLon, zoom?: number): void;
@@ -63,7 +64,7 @@ const LAYERS = ['cells-cluster', 'cells-pin', 'pubs-cluster', 'pubs-pin', 'selec
 // cluster-s, -m, -l aus dem Design System; ab 1.000 Kneipen (Länder, große Regionen) etwas größer
 const clusterSize = (n: number) => (n < 10 ? 44 : n < 100 ? 52 : n < 1000 ? 60 : 68);
 const clusterLabel = (n: number) =>
-  n < 1000 ? String(n) : n < 10000 ? `${(Math.floor(n / 100) / 10).toLocaleString('de-DE')}k` : `${Math.round(n / 1000)}k`;
+  n < 1000 ? String(n) : n < 10000 ? `${(Math.floor(n / 100) / 10).toLocaleString(LOCALE)}k` : `${Math.round(n / 1000)}k`;
 /** Abstand in Pixeln, ab dem Kreise verschmelzen. Weit draußen großzügig (ein Land bleibt ein, zwei Kreise
  *  statt Nord und Süd), nah dran knapp (Kreise verschmelzen erst, wenn sie sich überlappen). */
 const mergeRadius = (z: number) => (z <= 5 ? 120 : z === 6 ? 110 : z === 7 ? 100 : z === 8 ? 84 : z === 9 ? 66 : z === 10 ? 52 : 44);
@@ -169,7 +170,7 @@ function pubFeature(p: Pub, done: boolean): GeoJSON.Feature<GeoJSON.Point> {
  * bleiben. Für VoiceOver gibt es die Listenansicht mit denselben Orten.
  */
 export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
-  { pubs, loadTile, loadCountries, dataVersion = 0, collected, selectedId, onSelect, userPos, initialCenter, initialZoom = 15, onMapClick, onMove, label = 'Karte der Kneipen' },
+  { pubs, loadTile, loadCountries, dataVersion = 0, collected, selectedId, onSelect, userPos, initialCenter, initialZoom = 15, onMapClick, onMove, label = t('Karte der Kneipen') },
   ref
 ) {
   const box = useRef<HTMLDivElement>(null);
@@ -518,7 +519,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     <>
       <div className="map-fallback" aria-hidden="true" />
       <div ref={box} className="map" role="region" aria-label={label} />
-      <div className="map-attrib">© OpenStreetMap contributors{offline ? ' · Kartenbild offline' : ''}</div>
+      <div className="map-attrib">© OpenStreetMap contributors{offline ? ` · ${t('Kartenbild offline')}` : ''}</div>
     </>
   );
 });

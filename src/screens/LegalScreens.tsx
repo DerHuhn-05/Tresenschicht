@@ -1,9 +1,20 @@
 import type { ReactNode } from 'react';
-import { Page } from '../components/ui';
+import { Notice, Page } from '../components/ui';
 import { AUTHORITY, OPERATOR, PRIVACY_DATE } from '../lib/legal';
+import { LANG, t } from '../lib/i18n';
 
 function Mail() {
   return OPERATOR.email ? <a className="accent-text" href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a> : <span>per E-Mail (Adresse folgt)</span>;
+}
+
+/** Rechtstexte gibt es nur auf Deutsch; in der englischen Oberfläche ein kurzer Hinweis darüber */
+function GermanOnly() {
+  if (LANG === 'de') return null;
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <Notice>This legal text is only available in German, which is the legally binding version.</Notice>
+    </div>
+  );
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -34,8 +45,9 @@ function Rows({ rows, head }: { head: string[]; rows: string[][] }) {
 
 export function Impressum({ onBack }: { onBack: () => void }) {
   return (
-    <Page onBack={onBack} title="Impressum">
+    <Page onBack={onBack} title={t('Impressum')}>
       <div className="stack">
+        <GermanOnly />
         <h1 className="t-h2">Impressum</h1>
         <p className="muted">Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG)</p>
         <p>
@@ -66,7 +78,8 @@ export function Impressum({ onBack }: { onBack: () => void }) {
 
 export function Datenschutz({ onBack }: { onBack: () => void }) {
   return (
-    <Page onBack={onBack} title="Datenschutzerklärung">
+    <Page onBack={onBack} title={t('Datenschutzerklärung')}>
+      <GermanOnly />
       <h1 className="t-h2">Datenschutzerklärung</h1>
       <p className="muted t-secondary" style={{ marginTop: 4 }}>Stand: {PRIVACY_DATE}</p>
 

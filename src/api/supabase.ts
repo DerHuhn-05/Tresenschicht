@@ -3,6 +3,7 @@ import type { LatLon } from '../lib/geo';
 import type {
   Api, Bounds, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, SignUpData, User,
 } from './types';
+import { t } from '../lib/i18n';
 
 // Echtes Backend (supabase/schema.sql). Alle Regeln prüft der Server; die App zeigt nur an.
 type Row = Record<string, any>;
@@ -21,18 +22,18 @@ function must<T>(res: { data: T; error: { message: string } | null } | { data: u
 }
 
 function translate(msg: string): string {
-  if (/Invalid login credentials/i.test(msg)) return 'E-Mail oder Passwort stimmt nicht.';
-  if (/Email not confirmed/i.test(msg)) return 'Bitte bestätige zuerst deine E-Mail-Adresse.';
-  if (/already registered/i.test(msg)) return 'Für diese E-Mail gibt es schon ein Konto.';
-  if (/profiles_username_lower|duplicate key/i.test(msg)) return 'Dieser Benutzername ist schon vergeben.';
-  if (/birth_date/i.test(msg)) return 'Die App ist erst ab 18 Jahren.';
-  if (/Database error saving new user/i.test(msg)) return 'Konto konnte nicht angelegt werden. Prüfe Benutzername und Geburtsdatum.';
-  if (/expired|invalid.*(otp|token)|otp.*invalid|token.*invalid/i.test(msg)) return 'Der Code stimmt nicht oder ist abgelaufen. Fordere einen neuen an.';
-  if (/only request this after|security purposes/i.test(msg)) return 'Bitte warte kurz, bevor du einen neuen Code anforderst.';
-  if (/rate limit/i.test(msg)) return 'Gerade wurden zu viele E-Mails verschickt. Versuch es später noch einmal.';
-  if (/should be different|same.*password/i.test(msg)) return 'Das neue Passwort muss sich vom alten unterscheiden.';
-  if (/Failed to fetch|NetworkError/i.test(msg)) return 'Keine Verbindung. Prüfe dein Internet und versuche es noch einmal.';
-  return msg;
+  if (/Invalid login credentials/i.test(msg)) return t('E-Mail oder Passwort stimmt nicht.');
+  if (/Email not confirmed/i.test(msg)) return t('Bitte bestätige zuerst deine E-Mail-Adresse.');
+  if (/already registered/i.test(msg)) return t('Für diese E-Mail gibt es schon ein Konto.');
+  if (/profiles_username_lower|duplicate key/i.test(msg)) return t('Dieser Benutzername ist schon vergeben.');
+  if (/birth_date/i.test(msg)) return t('Die App ist erst ab 18 Jahren.');
+  if (/Database error saving new user/i.test(msg)) return t('Konto konnte nicht angelegt werden. Prüfe Benutzername und Geburtsdatum.');
+  if (/expired|invalid.*(otp|token)|otp.*invalid|token.*invalid/i.test(msg)) return t('Der Code stimmt nicht oder ist abgelaufen. Fordere einen neuen an.');
+  if (/only request this after|security purposes/i.test(msg)) return t('Bitte warte kurz, bevor du einen neuen Code anforderst.');
+  if (/rate limit/i.test(msg)) return t('Gerade wurden zu viele E-Mails verschickt. Versuch es später noch einmal.');
+  if (/should be different|same.*password/i.test(msg)) return t('Das neue Passwort muss sich vom alten unterscheiden.');
+  if (/Failed to fetch|NetworkError/i.test(msg)) return t('Keine Verbindung. Prüfe dein Internet und versuche es noch einmal.');
+  return t(msg);
 }
 
 export class SupabaseApi implements Api {
@@ -48,7 +49,7 @@ export class SupabaseApi implements Api {
   }
 
   private uid(): string {
-    if (!this.me) throw new Error('Du bist nicht angemeldet.');
+    if (!this.me) throw new Error(t('Du bist nicht angemeldet.'));
     return this.me.id;
   }
 
@@ -166,7 +167,7 @@ export class SupabaseApi implements Api {
     const { avatar, firstName, lastName, city, username } = patch;
     const row: Row = {};
     if (username !== undefined && username.toLowerCase() !== this.me?.username.toLowerCase()) {
-      if (!(await this.isUsernameFree(username))) throw new Error('Dieser Benutzername ist schon vergeben.');
+      if (!(await this.isUsernameFree(username))) throw new Error(t('Dieser Benutzername ist schon vergeben.'));
       row.username = username;
     } else if (username !== undefined) row.username = username; // nur Groß-/Kleinschreibung geändert
     if (firstName !== undefined) row.first_name = firstName;
@@ -264,7 +265,7 @@ export class SupabaseApi implements Api {
     const { data, error } = await this.sb.functions.invoke('pub-review', { body });
     if (error) {
       const msg = await (error as { context?: Response }).context?.json?.().then((j: Row) => j.error).catch(() => null);
-      throw new Error(msg || 'Die Prüfung ist gerade nicht erreichbar.');
+      throw new Error(msg || t('Die Prüfung ist gerade nicht erreichbar.'));
     }
     return data as T;
   }

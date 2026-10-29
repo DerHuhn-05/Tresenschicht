@@ -13,12 +13,13 @@ import { Datenschutz, Impressum } from './screens/LegalScreens';
 import { HelpScreen } from './screens/HelpScreen';
 import { load } from './lib/storage';
 import { LOCATION_ASKED, useApp, type Route, type Tab } from './state/app';
+import { t } from './lib/i18n';
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
-  { id: 'map', label: 'Karte', icon: 'map' },
-  { id: 'collection', label: 'Check-ins', icon: 'collection' },
-  { id: 'friends', label: 'Freunde', icon: 'friends' },
-  { id: 'profile', label: 'Profil', icon: 'profile' },
+  { id: 'map', label: t('Karte'), icon: 'map' },
+  { id: 'collection', label: t('Check-ins'), icon: 'collection' },
+  { id: 'friends', label: t('Freunde'), icon: 'friends' },
+  { id: 'profile', label: t('Profil'), icon: 'profile' },
 ];
 
 function RouteView({ r }: { r: Route }) {
@@ -60,9 +61,9 @@ export function App() {
       const ok = news.filter((n) => n.accepted);
       const no = news.filter((n) => !n.accepted);
       const parts = [];
-      if (ok.length) parts.push(ok.length === 1 ? (ok[0].kind === 'neu' ? `„${ok[0].name}“ ist geprüft und jetzt für alle auf der Karte.` : `Dein Vorschlag zu „${ok[0].name}“ wurde übernommen.`) : `${ok.length} deiner Vorschläge wurden übernommen.`);
-      if (no.length) parts.push(no.length === 1 ? `Deinen Vorschlag „${no[0].name}“ haben wir nicht übernommen.` : `${no.length} Vorschläge haben wir nicht übernommen.`);
-      app.notify(ok.length ? `${parts.join(' ')} Danke!` : parts.join(' '), ok.length ? 'success' : 'info');
+      if (ok.length) parts.push(ok.length === 1 ? (ok[0].kind === 'neu' ? t('„{name}“ ist geprüft und jetzt für alle auf der Karte.', { name: ok[0].name }) : t('Dein Vorschlag zu „{name}“ wurde übernommen.', { name: ok[0].name })) : t('{n} deiner Vorschläge wurden übernommen.', { n: ok.length }));
+      if (no.length) parts.push(no.length === 1 ? t('Deinen Vorschlag „{name}“ haben wir nicht übernommen.', { name: no[0].name }) : t('{n} Vorschläge haben wir nicht übernommen.', { n: no.length }));
+      app.notify(ok.length ? `${parts.join(' ')} ${t('Danke!')}` : parts.join(' '), ok.length ? 'success' : 'info');
       if (ok.length) app.bump();
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,7 +76,7 @@ export function App() {
         onDone={(u, isNew) => {
           app.setUser(u);
           app.setTab('map');
-          if (isNew) app.notify(`Willkommen, ${u.firstName}.`, 'success');
+          if (isNew) app.notify(t('Willkommen, {name}.', { name: u.firstName }), 'success');
         }}
       />
     );
@@ -96,14 +97,14 @@ export function App() {
         {app.tab === 'collection' && <CollectionScreen />}
         {app.tab === 'friends' && <FriendsScreen />}
         {app.tab === 'profile' && <ProfileScreen />}
-        <nav className="tabbar" aria-label="Hauptnavigation">
-          {TABS.map((t) => {
-            const on = app.tab === t.id;
+        <nav className="tabbar" aria-label={t('Hauptnavigation')}>
+          {TABS.map((tab) => {
+            const on = app.tab === tab.id;
             return (
-              <button key={t.id} className="tab" aria-current={on ? 'page' : undefined} onClick={() => app.setTab(t.id)}>
-                <Icon name={t.icon} muted={!on} />
-                <span>{t.label}</span>
-                {t.id === 'friends' && requests > 0 && <span className="badge" aria-label={`${requests} offene Anfragen`}>{requests}</span>}
+              <button key={tab.id} className="tab" aria-current={on ? 'page' : undefined} onClick={() => app.setTab(tab.id)}>
+                <Icon name={tab.icon} muted={!on} />
+                <span>{tab.label}</span>
+                {tab.id === 'friends' && requests > 0 && <span className="badge" aria-label={t('{n} offene Anfragen', { n: requests })}>{requests}</span>}
               </button>
             );
           })}

@@ -6,6 +6,7 @@ import { ageFrom } from '../lib/format';
 import { MIN_AGE } from '../lib/rules';
 import { isDemo } from '../state/app';
 import { Datenschutz, Impressum } from './LegalScreens';
+import { LANG, setLang, t } from '../lib/i18n';
 
 type AuthView = 'welcome' | 'register' | 'login' | 'reset' | 'confirm' | 'impressum' | 'datenschutz';
 
@@ -44,20 +45,21 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
           <path d="M10 19.5v-3.5a2 2 0 0 1 4 0v3.5" />
         </svg>
         <h1 className="t-display">Tresenschicht</h1>
-        <p className="lead t-body">Sammle die Kneipen, in denen du warst. Ein Tipp beim Reinkommen reicht. Deine Freunde sehen, wo ihr schon überall wart.</p>
+        <p className="lead t-body">{t('Sammle die Kneipen, in denen du warst. Ein Tipp beim Reinkommen reicht. Deine Freunde sehen, wo ihr schon überall wart.')}</p>
       </div>
       <div className="btn-stack">
-        <button className="btn btn-primary btn-block" onClick={() => setView('register')}>Konto erstellen</button>
-        <button className="btn btn-secondary btn-block" onClick={() => setView('login')}>Anmelden</button>
+        <button className="btn btn-primary btn-block" onClick={() => setView('register')}>{t('Konto erstellen')}</button>
+        <button className="btn btn-secondary btn-block" onClick={() => setView('login')}>{t('Anmelden')}</button>
         {isDemo && (
           <button className="btn btn-text btn-block" disabled={busy} onClick={demo}>
-            {busy ? 'Demo wird vorbereitet …' : 'Ohne Konto ausprobieren (Demo)'}
+            {busy ? t('Demo wird vorbereitet …') : t('Ohne Konto ausprobieren (Demo)')}
           </button>
         )}
-        <p className="t-legal" style={{ color: 'var(--gray-300)' }}>Ab 18 Jahren. Trink verantwortungsvoll.</p>
+        <p className="t-legal" style={{ color: 'var(--gray-300)' }}>{t('Ab 18 Jahren. Trink verantwortungsvoll.')}</p>
         <div className="legal-links" style={{ color: 'var(--gray-300)' }}>
-          <button onClick={() => setView('datenschutz')}>Datenschutz</button>
-          <button onClick={() => setView('impressum')}>Impressum</button>
+          <button onClick={() => setView('datenschutz')}>{t('Datenschutz')}</button>
+          <button onClick={() => setView('impressum')}>{t('Impressum')}</button>
+          <button onClick={() => setLang(LANG === 'de' ? 'en' : 'de')} lang={LANG === 'de' ? 'en' : 'de'}>{LANG === 'de' ? 'English' : 'Deutsch'}</button>
         </div>
       </div>
     </div>
@@ -81,31 +83,31 @@ function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (
   useEffect(() => {
     setFree(null);
     if (!USERNAME.test(f.username)) return;
-    const t = setTimeout(() => api.isUsernameFree(f.username).then(setFree).catch(() => setFree(null)), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => api.isUsernameFree(f.username).then(setFree).catch(() => setFree(null)), 300);
+    return () => clearTimeout(timer);
   }, [f.username]);
 
   const age = f.birthDate ? ageFrom(f.birthDate) : null;
   const errors = {
-    username: !f.username ? 'Bitte Benutzernamen eingeben.' : !USERNAME.test(f.username) ? '3 bis 24 Zeichen: Buchstaben, Ziffern, Punkt und Unterstrich.' : free === false ? 'Dieser Benutzername ist schon vergeben.' : null,
-    birthDate: !f.birthDate ? 'Bitte Geburtsdatum eingeben.' : age !== null && age < MIN_AGE ? `Die App ist erst ab ${MIN_AGE} Jahren.` : null,
-    email: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email) ? 'Bitte gültige E-Mail-Adresse eingeben.' : null,
-    password: f.password.length < 8 ? 'Mindestens 8 Zeichen.' : null,
-    firstName: !f.firstName.trim() ? 'Bitte Vornamen eingeben.' : null,
-    lastName: !f.lastName.trim() ? 'Bitte Nachnamen eingeben.' : null,
-    city: !f.city.trim() ? 'Bitte Stadt eingeben.' : null,
+    username: !f.username ? t('Bitte Benutzernamen eingeben.') : !USERNAME.test(f.username) ? t('3 bis 24 Zeichen: Buchstaben, Ziffern, Punkt und Unterstrich.') : free === false ? t('Dieser Benutzername ist schon vergeben.') : null,
+    birthDate: !f.birthDate ? t('Bitte Geburtsdatum eingeben.') : age !== null && age < MIN_AGE ? t('Die App ist erst ab {n} Jahren.', { n: MIN_AGE }) : null,
+    email: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email) ? t('Bitte gültige E-Mail-Adresse eingeben.') : null,
+    password: f.password.length < 8 ? t('Mindestens 8 Zeichen.') : null,
+    firstName: !f.firstName.trim() ? t('Bitte Vornamen eingeben.') : null,
+    lastName: !f.lastName.trim() ? t('Bitte Nachnamen eingeben.') : null,
+    city: !f.city.trim() ? t('Bitte Stadt eingeben.') : null,
   };
   const valid = Object.values(errors).every((x) => !x) && consent && free !== false;
   const show = (k: keyof typeof errors) => (touched[k] ? errors[k] : null);
 
   return (
-    <Page onBack={onBack} title="Konto erstellen">
+    <Page onBack={onBack} title={t('Konto erstellen')}>
       <form
         noValidate
         onSubmit={async (e) => {
           e.preventDefault();
           setTouched(Object.fromEntries(Object.keys(errors).map((k) => [k, true])));
-          if (!valid) return setError(consent ? 'Bitte prüfe die markierten Felder.' : 'Bitte bestätige Alter und Datenschutz.');
+          if (!valid) return setError(consent ? t('Bitte prüfe die markierten Felder.') : t('Bitte bestätige Alter und Datenschutz.'));
           setBusy(true);
           setError(null);
           try {
@@ -120,39 +122,39 @@ function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (
         }}
       >
         <div className="field" style={{ marginBottom: 16 }}>
-          <span className="field-label">Profilbild (optional)</span>
-          <PhotoPicker round value={avatar?.url} label="Profilbild wählen" onChange={(blob, url) => setAvatar(blob && url ? { blob, url } : null)} />
+          <span className="field-label">{t('Profilbild (optional)')}</span>
+          <PhotoPicker round value={avatar?.url} label={t('Profilbild wählen')} onChange={(blob, url) => setAvatar(blob && url ? { blob, url } : null)} />
         </div>
-        <Field label="Vorname" error={show('firstName')}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('firstName')} className="input" value={f.firstName} onChange={set('firstName')} onBlur={blur('firstName')} autoComplete="given-name" />}</Field>
-        <Field label="Nachname" error={show('lastName')}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('lastName')} className="input" value={f.lastName} onChange={set('lastName')} onBlur={blur('lastName')} autoComplete="family-name" />}</Field>
+        <Field label={t('Vorname')} error={show('firstName')}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('firstName')} className="input" value={f.firstName} onChange={set('firstName')} onBlur={blur('firstName')} autoComplete="given-name" />}</Field>
+        <Field label={t('Nachname')} error={show('lastName')}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('lastName')} className="input" value={f.lastName} onChange={set('lastName')} onBlur={blur('lastName')} autoComplete="family-name" />}</Field>
         <Field
-          label="Benutzername"
-          hint="Damit finden dich Freunde. Jeder sieht ihn."
+          label={t('Benutzername')}
+          hint={t('Damit finden dich Freunde. Jeder sieht ihn.')}
           error={show('username') ?? (free === false ? errors.username : null)}
-          ok={free && USERNAME.test(f.username) ? 'Frei.' : null}
+          ok={free && USERNAME.test(f.username) ? t('Frei.') : null}
         >
           {(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('username')} className="input" value={f.username} onChange={set('username')} onBlur={blur('username')} autoCapitalize="none" autoCorrect="off" autoComplete="username" />}
         </Field>
-        <Field label="Geburtsdatum" hint={`Die App ist ab ${MIN_AGE} Jahren.`} error={show('birthDate')}>
+        <Field label={t('Geburtsdatum')} hint={t('Die App ist ab {n} Jahren.', { n: MIN_AGE })} error={show('birthDate')}>
           {(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('birthDate')} className="input" type="date" value={f.birthDate} onChange={set('birthDate')} onBlur={blur('birthDate')} autoComplete="bday" max={new Date().toISOString().slice(0, 10)} />}
         </Field>
-        <Field label="Stadt" error={show('city')}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('city')} className="input" value={f.city} onChange={set('city')} onBlur={blur('city')} autoComplete="address-level2" />}</Field>
-        <Field label="E-Mail" error={show('email')}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('email')} className="input" type="email" value={f.email} onChange={set('email')} onBlur={blur('email')} autoComplete="email" autoCapitalize="none" />}</Field>
-        <Field label="Passwort" hint="Mindestens 8 Zeichen." error={show('password')}>
+        <Field label={t('Stadt')} error={show('city')}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('city')} className="input" value={f.city} onChange={set('city')} onBlur={blur('city')} autoComplete="address-level2" />}</Field>
+        <Field label={t('E-Mail')} error={show('email')}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('email')} className="input" type="email" value={f.email} onChange={set('email')} onBlur={blur('email')} autoComplete="email" autoCapitalize="none" />}</Field>
+        <Field label={t('Passwort')} hint={t('Mindestens 8 Zeichen.')} error={show('password')}>
           {(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!show('password')} className="input" type="password" value={f.password} onChange={set('password')} onBlur={blur('password')} autoComplete="new-password" />}
         </Field>
         <label className="check" style={{ marginTop: 16 }}>
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
           <span className="t-secondary">
-            Ich bin mindestens 18 Jahre alt und habe die{' '}
+            {t('Ich bin mindestens 18 Jahre alt und habe die')}{' '}
             <button type="button" className="accent-text" style={{ border: 0, background: 'none', padding: 0, font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }} onClick={(e) => { e.preventDefault(); setPrivacy(true); }}>
-              Datenschutzerklärung
+              {LANG === 'en' ? 'privacy policy' : 'Datenschutzerklärung'}
             </button>{' '}
-            gelesen.
+            {t('gelesen.')}
           </span>
         </label>
         {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
-        <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy}>{busy ? 'Konto wird erstellt …' : 'Konto erstellen'}</button>
+        <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy}>{busy ? t('Konto wird erstellt …') : t('Konto erstellen')}</button>
       </form>
       {privacy && <Datenschutz onBack={() => setPrivacy(false)} />}
     </Page>
@@ -164,9 +166,9 @@ function Login({ onBack, onDone, onReset, onConfirm }: { onBack: () => void; onD
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const unconfirmed = !!error && /bestätige/.test(error);
+  const unconfirmed = !!error && /bestätige|confirm/i.test(error);
   return (
-    <Page onBack={onBack} title="Anmelden">
+    <Page onBack={onBack} title={t('Anmelden')}>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -181,8 +183,8 @@ function Login({ onBack, onDone, onReset, onConfirm }: { onBack: () => void; onD
           }
         }}
       >
-        <Field label="E-Mail">{(id) => <input id={id} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" required />}</Field>
-        <Field label="Passwort">{(id) => <input id={id} className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />}</Field>
+        <Field label={t('E-Mail')}>{(id) => <input id={id} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" required />}</Field>
+        <Field label={t('Passwort')}>{(id) => <input id={id} className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />}</Field>
         {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
         {unconfirmed && (
           <button
@@ -198,11 +200,11 @@ function Login({ onBack, onDone, onReset, onConfirm }: { onBack: () => void; onD
               onConfirm(email.trim());
             }}
           >
-            Code zum Bestätigen schicken
+            {t('Code zum Bestätigen schicken')}
           </button>
         )}
-        <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy || !email || !password}>{busy ? 'Anmelden …' : 'Anmelden'}</button>
-        <button type="button" className="btn btn-text btn-block" style={{ marginTop: 12 }} onClick={onReset}>Passwort vergessen?</button>
+        <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy || !email || !password}>{busy ? t('Anmelden …') : t('Anmelden')}</button>
+        <button type="button" className="btn btn-text btn-block" style={{ marginTop: 12 }} onClick={onReset}>{t('Passwort vergessen?')}</button>
       </form>
     </Page>
   );
@@ -216,7 +218,7 @@ function Reset({ onBack, onDone }: { onBack: () => void; onDone: (u: User) => vo
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
-    <Page onBack={onBack} title="Passwort zurücksetzen">
+    <Page onBack={onBack} title={t('Passwort zurücksetzen')}>
       {sent ? (
         <form
           onSubmit={async (e) => {
@@ -233,15 +235,15 @@ function Reset({ onBack, onDone }: { onBack: () => void; onDone: (u: User) => vo
           }}
         >
           <Icon name="mail" size={32} />
-          <h1 className="t-h2" style={{ marginTop: 12 }}>Code eingeben</h1>
-          <p style={{ margin: '8px 0 20px' }}>Gibt es ein Konto zu {email}, bekommst du gleich eine E-Mail mit einem Code. Gib ihn hier ein und wähle ein neues Passwort.</p>
+          <h1 className="t-h2" style={{ marginTop: 12 }}>{t('Code eingeben')}</h1>
+          <p style={{ margin: '8px 0 20px' }}>{t('Gibt es ein Konto zu {email}, bekommst du gleich eine E-Mail mit einem Code. Gib ihn hier ein und wähle ein neues Passwort.', { email })}</p>
           <CodeField value={code} onChange={setCode} />
-          <Field label="Neues Passwort" hint="Mindestens 8 Zeichen.">
+          <Field label={t('Neues Passwort')} hint={t('Mindestens 8 Zeichen.')}>
             {(id, d) => <input id={id} aria-describedby={d} className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />}
           </Field>
           {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
           <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy || code.length < 6 || password.length < 8}>
-            {busy ? 'Wird gespeichert …' : 'Passwort speichern'}
+            {busy ? t('Wird gespeichert …') : t('Passwort speichern')}
           </button>
         </form>
       ) : (
@@ -257,10 +259,10 @@ function Reset({ onBack, onDone }: { onBack: () => void; onDone: (u: User) => vo
             }
           }}
         >
-          <p style={{ marginBottom: 20 }}>Gib deine E-Mail-Adresse ein. Wir schicken dir einen Code.</p>
-          <Field label="E-Mail">{(id) => <input id={id} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" required />}</Field>
+          <p style={{ marginBottom: 20 }}>{t('Gib deine E-Mail-Adresse ein. Wir schicken dir einen Code.')}</p>
+          <Field label={t('E-Mail')}>{(id) => <input id={id} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" required />}</Field>
           {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
-          <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={!email}>Code schicken</button>
+          <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={!email}>{t('Code schicken')}</button>
         </form>
       )}
     </Page>
@@ -270,7 +272,7 @@ function Reset({ onBack, onDone }: { onBack: () => void; onDone: (u: User) => vo
 /** Feld für den 6- bis 8-stelligen Code aus der E-Mail; iOS schlägt ihn aus der Mail-App vor. */
 function CodeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <Field label="Code aus der E-Mail">
+    <Field label={t('Code aus der E-Mail')}>
       {(id) => (
         <input
           id={id}
@@ -297,8 +299,8 @@ function ConfirmEmail({ email, onBack, onDone }: { email: string; onBack: () => 
   const [wait, setWait] = useState(60);
   useEffect(() => {
     if (wait <= 0) return;
-    const t = setTimeout(() => setWait(wait - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setWait(wait - 1), 1000);
+    return () => clearTimeout(timer);
   }, [wait]);
   async function submit(c = code) {
     if (c.length < 6 || busy) return;
@@ -313,7 +315,7 @@ function ConfirmEmail({ email, onBack, onDone }: { email: string; onBack: () => 
     }
   }
   return (
-    <Page onBack={onBack} title="E-Mail bestätigen">
+    <Page onBack={onBack} title={t('E-Mail bestätigen')}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -321,12 +323,12 @@ function ConfirmEmail({ email, onBack, onDone }: { email: string; onBack: () => 
         }}
       >
         <Icon name="mail" size={32} />
-        <h1 className="t-h2" style={{ marginTop: 12 }}>Schau in dein Postfach</h1>
-        <p style={{ margin: '8px 0 20px' }}>Wir haben dir einen Code an <strong>{email}</strong> geschickt. Gib ihn hier ein, dann bist du drin.</p>
+        <h1 className="t-h2" style={{ marginTop: 12 }}>{t('Schau in dein Postfach')}</h1>
+        <p style={{ margin: '8px 0 20px' }}>{t('Wir haben dir einen Code an {email} geschickt. Gib ihn hier ein, dann bist du drin.', { email })}</p>
         <CodeField value={code} onChange={setCode} />
         {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
         <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy || code.length < 6}>
-          {busy ? 'Wird geprüft …' : 'Bestätigen'}
+          {busy ? t('Wird geprüft …') : t('Bestätigen')}
         </button>
         <button
           type="button"
@@ -343,9 +345,9 @@ function ConfirmEmail({ email, onBack, onDone }: { email: string; onBack: () => 
             }
           }}
         >
-          {wait > 0 ? `Neuen Code in ${wait} s anfordern` : 'Neuen Code anfordern'}
+          {wait > 0 ? t('Neuen Code in {n} s anfordern', { n: wait }) : t('Neuen Code anfordern')}
         </button>
-        <p className="t-caption muted" style={{ marginTop: 16 }}>Keine Mail? Schau im Spam-Ordner nach. Den Link in der Mail brauchst du nicht.</p>
+        <p className="t-caption muted" style={{ marginTop: 16 }}>{t('Keine Mail? Schau im Spam-Ordner nach. Den Link in der Mail brauchst du nicht.')}</p>
       </form>
     </Page>
   );
@@ -357,17 +359,17 @@ export function LocationOnboarding({ onAllow, onLater }: { onAllow: () => void; 
     <div className="screen" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingTop: 'calc(env(safe-area-inset-top) + 64px)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
       <div className="stack">
         <Icon name="location" size={32} />
-        <h1 className="t-h1">Einchecken mit einem Tipp</h1>
-        <p>Wenn du die App in einer Kneipe öffnest, schaut sie kurz, wo du bist, und fragt: „Bist du hier?“</p>
+        <h1 className="t-h1">{t('Einchecken mit einem Tipp')}</h1>
+        <p>{t('Wenn du die App in einer Kneipe öffnest, schaut sie kurz, wo du bist, und fragt: „Bist du hier?“')}</p>
         <ul style={{ paddingLeft: 20, margin: 0 }} className="muted">
-          <li>Nur, solange die App offen ist</li>
-          <li>Kein Tracking im Hintergrund</li>
-          <li>Niemand sieht deinen Standort, nur deine Kneipen</li>
+          <li>{t('Nur, solange die App offen ist')}</li>
+          <li>{t('Kein Tracking im Hintergrund')}</li>
+          <li>{t('Niemand sieht deinen Standort, nur deine Kneipen')}</li>
         </ul>
       </div>
       <div className="btn-stack">
-        <button className="btn btn-primary btn-block" onClick={onAllow}>Standort erlauben</button>
-        <button className="btn btn-text btn-block" onClick={onLater}>Später</button>
+        <button className="btn btn-primary btn-block" onClick={onAllow}>{t('Standort erlauben')}</button>
+        <button className="btn btn-text btn-block" onClick={onLater}>{t('Später')}</button>
       </div>
     </div>
   );

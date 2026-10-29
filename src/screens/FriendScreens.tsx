@@ -8,6 +8,7 @@ import { relativeTime } from '../lib/format';
 import { useApp } from '../state/app';
 import { StatsPanel } from '../components/Stats';
 import { CollectionView, VisitCard } from './CollectionScreens';
+import { t } from '../lib/i18n';
 
 export function FriendsScreen() {
   const app = useApp();
@@ -26,27 +27,27 @@ export function FriendsScreen() {
 
   useEffect(() => {
     if (q.trim().length < 2) return setFound(null);
-    const t = setTimeout(() => api.searchUsers(q).then(setFound).catch(() => setFound([])), 250);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => api.searchUsers(q).then(setFound).catch(() => setFound([])), 250);
+    return () => clearTimeout(timer);
   }, [q, app.version]);
 
   async function respond(id: string, accept: boolean) {
     await api.respondFriendRequest(id, accept);
-    app.notify(accept ? 'Ihr seid jetzt befreundet.' : 'Anfrage abgelehnt.', 'success');
+    app.notify(accept ? t('Ihr seid jetzt befreundet.') : t('Anfrage abgelehnt.'), 'success');
     app.bump();
   }
 
   return (
     <div className="screen">
-      <h1 className="t-display page-title">Freunde</h1>
+      <h1 className="t-display page-title">{t('Freunde')}</h1>
       <div className="input-icon">
         <Icon name="search" />
-        <input className="input" type="search" placeholder="Benutzername suchen" aria-label="Freunde nach Benutzername suchen" value={q} onChange={(e) => setQ(e.target.value)} autoCapitalize="none" autoCorrect="off" />
+        <input className="input" type="search" placeholder={t('Benutzername suchen')} aria-label={t('Freunde nach Benutzername suchen')} value={q} onChange={(e) => setQ(e.target.value)} autoCapitalize="none" autoCorrect="off" />
       </div>
 
       {found ? (
         <section className="section" style={{ marginTop: 16 }} aria-live="polite">
-          {found.length === 0 ? <p className="muted">Niemand mit diesem Benutzernamen.</p> : (
+          {found.length === 0 ? <p className="muted">{t('Niemand mit diesem Benutzernamen.')}</p> : (
             <ul className="list">
               {found.map((u) => (
                 <li key={u.id}>
@@ -54,7 +55,7 @@ export function FriendsScreen() {
                     <Avatar url={u.avatarUrl} name={u.username} size="sm" />
                     <div className="grow">
                       <div className="title">@{u.username}</div>
-                      <div className="sub">{{ friends: 'Befreundet', requested_by_me: 'Angefragt', requested_by_them: 'Möchte mit dir befreundet sein', none: 'Privates Profil', self: '', blocked: 'Gesperrt' }[u.friendship]}</div>
+                      <div className="sub">{{ friends: t('Befreundet'), requested_by_me: t('Angefragt'), requested_by_them: t('Möchte mit dir befreundet sein'), none: t('Privates Profil'), self: '', blocked: t('Gesperrt') }[u.friendship]}</div>
                     </div>
                     <span className="chev"><Icon name="chevron-right" /></span>
                   </button>
@@ -67,7 +68,7 @@ export function FriendsScreen() {
         <>
           {requests.length > 0 && (
             <section className="section" style={{ marginTop: 24 }}>
-              <h2 className="t-h3 section-title">Anfragen</h2>
+              <h2 className="t-h3 section-title">{t('Anfragen')}</h2>
               <ul className="list">
                 {requests.map((r) => (
                   <li key={r.user.id} className="list-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
@@ -77,8 +78,8 @@ export function FriendsScreen() {
                       <div className="sub">{relativeTime(r.at)}</div>
                     </div>
                     <div className="row-gap">
-                      <button className="btn btn-primary" style={{ minWidth: 0, minHeight: 44 }} onClick={() => respond(r.user.id, true)}>Annehmen</button>
-                      <button className="btn btn-text" onClick={() => respond(r.user.id, false)} aria-label={`Anfrage von ${r.user.username} ablehnen`}>Ablehnen</button>
+                      <button className="btn btn-primary" style={{ minWidth: 0, minHeight: 44 }} onClick={() => respond(r.user.id, true)}>{t('Annehmen')}</button>
+                      <button className="btn btn-text" onClick={() => respond(r.user.id, false)} aria-label={t('Anfrage von {name} ablehnen', { name: r.user.username })}>{t('Ablehnen')}</button>
                     </div>
                   </li>
                 ))}
@@ -86,17 +87,17 @@ export function FriendsScreen() {
             </section>
           )}
 
-          <div className="segmented" role="tablist" aria-label="Ansicht" style={{ marginTop: 24 }}>
-            <button role="tab" aria-selected={view === 'feed'} onClick={() => setView('feed')}>Feed</button>
+          <div className="segmented" role="tablist" aria-label={t('Ansicht')} style={{ marginTop: 24 }}>
+            <button role="tab" aria-selected={view === 'feed'} onClick={() => setView('feed')}>{t('Feed')}</button>
             <button role="tab" aria-selected={view === 'friends'} onClick={() => setView('friends')}>
-              Freunde{friends ? ` (${friends.length})` : ''}
+              {t('Freunde')}{friends ? ` (${friends.length})` : ''}
             </button>
           </div>
 
           <div style={{ marginTop: 16 }}>
             {view === 'feed' ? (
               !feed ? <Spinner /> : feed.length === 0 ? (
-                <Empty icon="feed" title="Noch nichts los" text="Hier siehst du, wo deine Freunde eingecheckt haben. Such oben nach ihrem Benutzernamen." />
+                <Empty icon="feed" title={t('Noch nichts los')} text={t('Hier siehst du, wo deine Freunde eingecheckt haben. Such oben nach ihrem Benutzernamen.')} />
               ) : (
                 feed.map((f) => (
                   <div key={f.checkin.id} style={{ marginBottom: 12 }}>
@@ -109,7 +110,7 @@ export function FriendsScreen() {
                 ))
               )
             ) : !friends ? <Spinner /> : friends.length === 0 ? (
-              <Empty icon="friends" title="Noch keine Freunde" text="Such oben nach einem Benutzernamen und schick eine Anfrage." />
+              <Empty icon="friends" title={t('Noch keine Freunde')} text={t('Such oben nach einem Benutzernamen und schick eine Anfrage.')} />
             ) : (
               <ul className="list">
                 {friends.map((u) => (
@@ -152,8 +153,8 @@ export function UserProfile({ id }: { id: string }) {
     });
   }, [id, app.version]);
 
-  if (p === undefined) return <Page onBack={app.pop} title="Profil"><Spinner /></Page>;
-  if (p === null) return <Page onBack={app.pop} title="Profil"><p>Dieses Profil gibt es nicht mehr.</p></Page>;
+  if (p === undefined) return <Page onBack={app.pop} title={t('Profil')}><Spinner /></Page>;
+  if (p === null) return <Page onBack={app.pop} title={t('Profil')}><p>{t('Dieses Profil gibt es nicht mehr.')}</p></Page>;
 
   const friends = p.friendship === 'friends';
   return (
@@ -168,27 +169,27 @@ export function UserProfile({ id }: { id: string }) {
 
       {p.friendship === 'blocked' && (
         <div className="stack" style={{ marginTop: 24 }}>
-          <p className="muted">Du hast @{p.username} gesperrt. Ihr findet euch nicht in der Suche und könnt euch keine Anfragen schicken.</p>
-          <button className="btn btn-secondary btn-block" onClick={async () => { await api.unblockUser(p.id); app.notify(`@${p.username} ist entsperrt.`, 'success'); app.bump(); }}>
-            Entsperren
+          <p className="muted">{t('Du hast @{name} gesperrt. Ihr findet euch nicht in der Suche und könnt euch keine Anfragen schicken.', { name: p.username })}</p>
+          <button className="btn btn-secondary btn-block" onClick={async () => { await api.unblockUser(p.id); app.notify(t('@{name} ist entsperrt.', { name: p.username }), 'success'); app.bump(); }}>
+            {t('Entsperren')}
           </button>
         </div>
       )}
 
       {!friends && p.friendship !== 'blocked' && (
         <div className="stack" style={{ marginTop: 24 }}>
-          <div className="row-gap muted"><Icon name="lock" size={20} /><span>Dieses Profil ist privat. Sammlung und Fotos sehen nur Freunde.</span></div>
+          <div className="row-gap muted"><Icon name="lock" size={20} /><span>{t('Dieses Profil ist privat. Sammlung und Fotos sehen nur Freunde.')}</span></div>
           {p.friendship === 'none' && (
-            <button className="btn btn-primary btn-block" onClick={async () => { await api.sendFriendRequest(p.id); app.notify('Anfrage gesendet.', 'success'); app.bump(); }}>
+            <button className="btn btn-primary btn-block" onClick={async () => { await api.sendFriendRequest(p.id); app.notify(t('Anfrage gesendet.'), 'success'); app.bump(); }}>
               <Icon name="friend-add" />
-              Freundschaft anfragen
+              {t('Freundschaft anfragen')}
             </button>
           )}
-          {p.friendship === 'requested_by_me' && <p className="muted">Anfrage gesendet. Sobald @{p.username} annimmt, seht ihr gegenseitig eure Kneipen.</p>}
+          {p.friendship === 'requested_by_me' && <p className="muted">{t('Anfrage gesendet. Sobald @{name} annimmt, seht ihr gegenseitig eure Kneipen.', { name: p.username })}</p>}
           {p.friendship === 'requested_by_them' && (
             <div className="row-gap">
-              <button className="btn btn-primary" onClick={async () => { await api.respondFriendRequest(p.id, true); app.notify('Ihr seid jetzt befreundet.', 'success'); app.bump(); }}>Annehmen</button>
-              <button className="btn btn-secondary" onClick={async () => { await api.respondFriendRequest(p.id, false); app.bump(); }}>Ablehnen</button>
+              <button className="btn btn-primary" onClick={async () => { await api.respondFriendRequest(p.id, true); app.notify(t('Ihr seid jetzt befreundet.'), 'success'); app.bump(); }}>{t('Annehmen')}</button>
+              <button className="btn btn-secondary" onClick={async () => { await api.respondFriendRequest(p.id, false); app.bump(); }}>{t('Ablehnen')}</button>
             </div>
           )}
         </div>
@@ -199,43 +200,43 @@ export function UserProfile({ id }: { id: string }) {
           {!entries ? <Spinner /> : (
             <>
               <div style={{ margin: '24px 0' }}><StatsPanel entries={entries} /></div>
-              {entries.length === 0 ? <p className="muted">@{p.username} hat noch keine Kneipe gesammelt.</p> : <CollectionView entries={entries} userId={p.id} own={false} />}
+              {entries.length === 0 ? <p className="muted">{t('@{name} hat noch keine Kneipe gesammelt.', { name: p.username })}</p> : <CollectionView entries={entries} userId={p.id} own={false} />}
               <section className="section">
-                <h2 className="t-h3 section-title">Abzeichen</h2>
+                <h2 className="t-h3 section-title">{t('Abzeichen')}</h2>
                 <BadgeGrid badges={badgesOf(entries, visits)} onlyEarned />
               </section>
             </>
           )}
           <button className="btn btn-text btn-block danger-text" style={{ marginTop: 32 }} onClick={() => setRemove(true)}>
-            Freundschaft beenden
+            {t('Freundschaft beenden')}
           </button>
         </>
       )}
       {p.friendship !== 'blocked' && (
         <button className="btn btn-text btn-block danger-text" style={{ marginTop: friends ? 0 : 32 }} onClick={() => setBlock(true)}>
-          @{p.username} sperren
+          {t('@{name} sperren', { name: p.username })}
         </button>
       )}
       {block && (
         <Confirm
-          title={`@${p.username} sperren?`}
-          text={`Eine Freundschaft endet. Ihr findet euch nicht mehr in der Suche und könnt euch keine Anfragen schicken. @${p.username} erfährt nichts davon. Du kannst das jederzeit im Profil unter „Gesperrte Nutzer“ aufheben.`}
-          confirm="Sperren"
+          title={t('@{name} sperren?', { name: p.username })}
+          text={t('Eine Freundschaft endet. Ihr findet euch nicht mehr in der Suche und könnt euch keine Anfragen schicken. @{name} erfährt nichts davon. Du kannst das jederzeit im Profil unter „Gesperrte Nutzer“ aufheben.', { name: p.username })}
+          confirm={t('Sperren')}
           danger
           onCancel={() => setBlock(false)}
           onConfirm={async () => {
             setBlock(false);
             await api.blockUser(p.id);
-            app.notify(`@${p.username} ist gesperrt.`, 'success');
+            app.notify(t('@{name} ist gesperrt.', { name: p.username }), 'success');
             app.bump();
           }}
         />
       )}
       {remove && (
         <Confirm
-          title="Freundschaft beenden?"
-          text={`Ihr seht dann gegenseitig keine Kneipen und Fotos mehr. @${p.username} wird nicht benachrichtigt.`}
-          confirm="Beenden"
+          title={t('Freundschaft beenden?')}
+          text={t('Ihr seht dann gegenseitig keine Kneipen und Fotos mehr. @{name} wird nicht benachrichtigt.', { name: p.username })}
+          confirm={t('Beenden')}
           danger
           onCancel={() => setRemove(false)}
           onConfirm={async () => {

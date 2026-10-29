@@ -474,16 +474,17 @@ begin
 end;
 $$;
 
--- Abschluss: Kneipen der importierten Länder, die in OSM fehlen, ausblenden (nicht löschen, Sammlungen bleiben)
-create or replace function public.finish_pub_import(p_started timestamptz) returns jsonb
+-- Abschluss: Kneipen der Länder dieses Laufs, die in OSM fehlen, ausblenden (nicht löschen, Sammlungen bleiben).
+-- Die Länder kommen ausdrücklich vom Workflow. Früher wurden sie aus den importierten Kneipen abgeleitet; weil jede
+-- Geofabrik-Datei einen Randstreifen der Nachbarländer enthält, wurden so fälschlich ganze Nachbarländer ausgeblendet.
+drop function if exists public.finish_pub_import(timestamptz);
+create or replace function public.finish_pub_import(p_started timestamptz, p_countries text[]) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare
-  touched text[];
   closed integer;
 begin
-  select array_agg(distinct country) into touched from pubs where source = 'osm' and updated_at >= p_started;
   update pubs set status = 'geschlossen', updated_at = now()
-  where source = 'osm' and status = 'aktiv' and updated_at < p_started and country = any (coalesce(touched, '{}'));
+  where source = 'osm' and status = 'aktiv' and updated_at < p_started and country = any (p_countries);
   get diagnostics closed = row_count;
   return jsonb_build_object(
     'geschlossen', closed,
@@ -496,11 +497,11 @@ $$;
 revoke execute on function public.import_now() from public, anon, authenticated;
 revoke execute on function public.import_country(text, text, jsonb) from public, anon, authenticated;
 revoke execute on function public.import_pubs(jsonb) from public, anon, authenticated;
-revoke execute on function public.finish_pub_import(timestamptz) from public, anon, authenticated;
+revoke execute on function public.finish_pub_import(timestamptz, text[]) from public, anon, authenticated;
 grant execute on function public.import_now() to service_role;
 grant execute on function public.import_country(text, text, jsonb) to service_role;
 grant execute on function public.import_pubs(jsonb) to service_role;
-grant execute on function public.finish_pub_import(timestamptz) to service_role;
+grant execute on function public.finish_pub_import(timestamptz, text[]) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Karte (Inhalt von supabase/map-functions.sql)

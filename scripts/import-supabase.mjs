@@ -9,6 +9,11 @@ import { readPubs } from './osm-lib.mjs';
 
 const ALLOWED = ['DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL', 'IT', 'ES'];
 const BATCH = 1000;
+// Geofabrik-Region → Land. Nur diese Länder gelten in einem Lauf als „vollständig importiert“.
+const REGION_COUNTRY = {
+  germany: 'DE', austria: 'AT', switzerland: 'CH', france: 'FR', belgium: 'BE', netherlands: 'NL', luxembourg: 'LU',
+  denmark: 'DK', poland: 'PL', 'czech-republic': 'CZ', italy: 'IT', spain: 'ES',
+};
 const [cmd, file] = process.argv.slice(2);
 const url = (process.env.SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
 const key = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
@@ -73,6 +78,10 @@ if (cmd === 'check') {
   }
   if (n !== ALLOWED.length) console.log(`::warning::Nur ${n} von ${ALLOWED.length} Ländern gefunden.`);
 } else if (cmd === 'pubs') {
+  const regions = (process.env.REGIONEN ?? '').split(/\s+/).filter(Boolean);
+  const countries = regions.map((r) => REGION_COUNTRY[r]).filter(Boolean);
+  if (!countries.length) fail('Keine bekannten Regionen in REGIONEN angegeben.');
+  console.log(`Länder dieses Laufs: ${countries.join(', ')}`);
   const started = await rpc('import_now', {});
   let batch = [];
   let read = 0;
@@ -95,7 +104,7 @@ if (cmd === 'check') {
   }
   await flush();
   console.log(`\n${read} Kneipen gelesen, ${skipped} übersprungen (ohne Namen, Club, geschlossen), ${saved} gespeichert (Rest außerhalb der zehn Länder).`);
-  const summary = await rpc('finish_pub_import', { p_started: started });
+  const summary = await rpc('finish_pub_import', { p_started: started, p_countries: countries });
   console.log(`In OSM nicht mehr vorhanden, jetzt ausgeblendet: ${summary.geschlossen}`);
   console.log('Aktive Orte je Land:', JSON.stringify(summary.aktiv));
   console.log('Aktive Orte je Art:', JSON.stringify(summary.nach_art));

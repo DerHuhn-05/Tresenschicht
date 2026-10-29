@@ -1,6 +1,6 @@
 import { distanceM, inWorkArea, type LatLon } from '../lib/geo';
 import { blobToDataUrl } from '../lib/image';
-import { LOCK_MINUTES, MAX_ACCURACY_M, RADIUS_M, SAME_PUB_HOURS } from '../lib/rules';
+import { GPS_ALLOWANCE_M, LOCK_MINUTES, MAX_ACCURACY_M, RADIUS_M, SAME_PUB_HOURS } from '../lib/rules';
 import { load, save } from '../lib/storage';
 import { CELLS_PER_TILE, DETAIL_ZOOM, latToTileY, lonToTileX } from '../lib/tiles';
 import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
@@ -271,12 +271,12 @@ export class DemoApi implements Api {
     );
   }
 
-  async nearbyPubs(pos: LatLon) {
+  async nearbyPubs(pos: LatLon, accuracy = 0) {
     if (!inWorkArea(pos)) return this.wait({ inArea: false, pubs: [] });
     const pubs = this.db.pubs
       .filter((p) => p.status === 'aktiv')
       .map((p) => ({ ...p, distance: distanceM(pos, p) }))
-      .filter((p) => p.distance <= RADIUS_M)
+      .filter((p) => p.distance <= RADIUS_M + Math.min(Math.max(accuracy, 0), GPS_ALLOWANCE_M))
       .sort((a, b) => a.distance - b.distance);
     return this.wait({ inArea: true, pubs });
   }
@@ -392,7 +392,7 @@ export class DemoApi implements Api {
     const pub = this.pub(pubId);
     if (accuracy > MAX_ACCURACY_M) return { ok: false, reason: 'accuracy' };
     if (!inWorkArea(pos)) return { ok: false, reason: 'country' };
-    if (distanceM(pos, pub) > RADIUS_M + Math.min(accuracy, 50)) return { ok: false, reason: 'too_far' };
+    if (distanceM(pos, pub) > RADIUS_M + Math.min(accuracy, GPS_ALLOWANCE_M)) return { ok: false, reason: 'too_far' };
     const mine = this.db.checkins.filter((c) => c.userId === me.id).sort((a, b) => b.at.localeCompare(a.at));
     const now = Date.now();
     if (mine[0] && now - Date.parse(mine[0].at) < LOCK_MINUTES * 60_000) {

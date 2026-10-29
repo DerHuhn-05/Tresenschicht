@@ -226,7 +226,7 @@ begin
       select p.id, p.name, p.type, p.lat, p.lon, p.address, p.city, p.country, p.status, p.source, p.opening_hours,
              st_distance(p.geom, me) as distance
       from pubs p
-      where p.status = 'aktiv' and st_dwithin(p.geom, me, 50)
+      where p.status = 'aktiv' and st_dwithin(p.geom, me, 20 + least(greatest(p_accuracy, 0), 20))
       order by st_distance(p.geom, me)
       limit 10
     ) x
@@ -260,7 +260,7 @@ begin
   if country_at(p_lat, p_lon) is null then return jsonb_build_object('ok', false, 'reason', 'country'); end if;
 
   select * into pub from pubs where id = p_pub and status = 'aktiv';
-  if not found or st_distance(pub.geom, st_setsrid(st_makepoint(p_lon, p_lat), 4326)::geography) > 50 + least(p_accuracy, 50) then
+  if not found or st_distance(pub.geom, st_setsrid(st_makepoint(p_lon, p_lat), 4326)::geography) > 20 + least(p_accuracy, 20) then
     return jsonb_build_object('ok', false, 'reason', 'too_far');
   end if;
 

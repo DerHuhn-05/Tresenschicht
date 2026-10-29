@@ -43,7 +43,7 @@ begin
     -- dieselben Regeln wie check_in(): Genauigkeit, Abstand, 5-Minuten-Sperre
     if p_accuracy is null or p_accuracy > 100 then
       ci := jsonb_build_object('ok', false, 'reason', 'accuracy');
-    elsif st_distance(new_pub.geom, st_setsrid(st_makepoint(p_pos_lon, p_pos_lat), 4326)::geography) > 50 + least(p_accuracy, 50) then
+    elsif st_distance(new_pub.geom, st_setsrid(st_makepoint(p_pos_lon, p_pos_lat), 4326)::geography) > 20 + least(p_accuracy, 20) then
       ci := jsonb_build_object('ok', false, 'reason', 'too_far');
     else
       select * into last_ci from checkins where user_id = uid order by created_at desc limit 1;

@@ -4,7 +4,7 @@ import { Icon, type IconName } from '../components/Icon';
 import { Confirm, Field, Notice, Page, PhotoPicker, Spinner } from '../components/ui';
 import { formatDate, formatDistance, PUB_TYPE_LABEL, relativeTime } from '../lib/format';
 import { distanceM, type LatLon } from '../lib/geo';
-import { MAX_ACCURACY_M, RADIUS_M, REFUSAL_TEXT } from '../lib/rules';
+import { GPS_ALLOWANCE_M, MAX_ACCURACY_M, RADIUS_M, REFUSAL_TEXT } from '../lib/rules';
 import { PubMap } from '../map/LazyMap';
 import markerLight from '../assets/pub-marker.svg';
 import { useApp } from '../state/app';
@@ -37,7 +37,7 @@ export function PubDetail({ id }: { id: string }) {
   if (pub === null) return <Page onBack={app.pop} title="Kneipe"><p>Diese Kneipe gibt es nicht mehr.</p></Page>;
 
   const dist = app.location.pos ? distanceM(app.location.pos, pub) : null;
-  const near = dist !== null && dist <= RADIUS_M + Math.min(app.location.accuracy ?? 0, 50);
+  const near = dist !== null && dist <= RADIUS_M + Math.min(app.location.accuracy ?? 0, GPS_ALLOWANCE_M);
 
   return (
     <Page onBack={app.pop} title={PUB_TYPE_LABEL[pub.type]}>
@@ -282,7 +282,7 @@ export function AddPub({ pos }: { pos?: LatLon }) {
 
   // Vor Ort? Dann zählt das Eintragen gleich als Check-in (gleiche Regeln wie beim normalen Check-in)
   const { pos: me, accuracy } = app.location;
-  const onSite = !!(me && where && accuracy != null && accuracy <= MAX_ACCURACY_M && distanceM(me, where) <= RADIUS_M + Math.min(accuracy, 50));
+  const onSite = !!(me && where && accuracy != null && accuracy <= MAX_ACCURACY_M && distanceM(me, where) <= RADIUS_M + Math.min(accuracy, GPS_ALLOWANCE_M));
   const [withCheckIn, setWithCheckIn] = useState(true);
   const checkInNow = onSite && withCheckIn && !app.lockedUntil;
 

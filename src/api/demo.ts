@@ -172,6 +172,24 @@ export class DemoApi implements Api {
     await this.wait(null);
   }
 
+  // Im Demo-Modus gibt es keine E-Mails; jeder sechsstellige Code gilt.
+  async verifyEmailCode() {
+    return this.publicUser(this.me());
+  }
+
+  async resendEmailCode() {
+    await this.wait(null);
+  }
+
+  async resetPasswordWithCode(email: string, _code: string, password: string) {
+    const u = this.db.users.find((x) => x.email.toLowerCase() === email.toLowerCase());
+    if (!u) throw new Error('Der Code stimmt nicht oder ist abgelaufen. Fordere einen neuen an.');
+    u.password = password;
+    this.db.session = u.id;
+    this.commit();
+    return this.publicUser(u);
+  }
+
   async deleteAccount() {
     const me = this.me().id;
     this.db.checkins = this.db.checkins.filter((c) => c.userId !== me);

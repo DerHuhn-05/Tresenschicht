@@ -73,6 +73,8 @@ const Ctx = createContext<AppCtx | null>(null);
 export const useApp = () => useContext(Ctx)!;
 
 const isDemo = api.mode === 'demo';
+/** Gesetzt, sobald die App einmal nach dem Standort gefragt hat (Onboarding erledigt). */
+export const LOCATION_ASKED = 'kneipen-location-asked';
 
 export function AppProvider({ children, initialUser }: { children: ReactNode; initialUser: User | null }) {
   const [user, setUser] = useState<User | null>(initialUser);
@@ -82,6 +84,8 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
   const [version, setVersion] = useState(0);
   const [lastCheckIn, setLastCheckIn] = useState<CheckIn | null>(null);
   const [location, setLocation] = useState<LocationState>(() => {
+    if (load('kneipen-location-granted', false)) save(LOCATION_ASKED, true); // ältere Version
+
     const simulated = isDemo && load('kneipen-demo-simulate', true);
     return simulated
       ? { status: 'ok', pos: load('kneipen-demo-pos', DEMO_START), accuracy: 15, simulated: true, fix: 1 }
@@ -113,13 +117,20 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
       return;
     }
     stopWatch();
+    save(LOCATION_ASKED, true);
     setLocation((l) => (l.status === 'ok' ? l : { ...l, status: 'asking' }));
     watchId.current = navigator.geolocation.watchPosition(
       (p) => {
         save('kneipen-location-granted', true);
         setLocation((l) => ({ status: 'ok', simulated: false, pos: { lat: p.coords.latitude, lon: p.coords.longitude }, accuracy: p.coords.accuracy, fix: l.fix + 1 }));
       },
-      (err) => setLocation((l) => ({ ...l, status: err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable' })),
+      (err) =>
+        setLocation((l) => {
+          if (err.code === err.PERMISSION_DENIED) return { ...l, status: 'denied' };
+          // Zeitüberschreitung: die Abfrage läuft weiter, ein Standort kann noch kommen
+          if (err.code === err.TIMEOUT) return l.status === 'ok' ? l : { ...l, status: 'asking' };
+          return { ...l, status: 'unavailable' };
+        }),
       { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 }
     );
   }, [stopWatch]);
@@ -153,9 +164,9 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
 
   useEffect(() => {
     if (!user || location.simulated) return;
-    // iOS fragt in Web-Apps pro Sitzung neu; wer schon einmal erlaubt hat, bekommt die Abfrage direkt.
-    if (load('kneipen-location-granted', false)) startWatch();
-    const onVis = () => (document.hidden ? stopWatch() : load('kneipen-location-granted', false) && startWatch());
+    // iOS fragt in Web-Apps pro Sitzung neu: Wer das Onboarding hinter sich hat, bekommt die Abfrage bei jedem Öffnen.
+    if (load(LOCATION_ASKED, false)) startWatch();
+    const onVis = () => (document.hidden ? stopWatch() : load(LOCATION_ASKED, false) && startWatch());
     document.addEventListener('visibilitychange', onVis);
     return () => {
       document.removeEventListener('visibilitychange', onVis);

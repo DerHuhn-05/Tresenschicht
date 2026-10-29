@@ -11,6 +11,7 @@ type AuthView = 'welcome' | 'register' | 'login' | 'reset' | 'confirm';
 export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void }) {
   const [view, setView] = useState<AuthView>('welcome');
   const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState('');
 
   async function demo() {
     setBusy(true);
@@ -22,20 +23,14 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
     }
   }
 
-  if (view === 'register') return <Register onBack={() => setView('welcome')} onDone={onDone} onConfirm={() => setView('confirm')} />;
-  if (view === 'login') return <Login onBack={() => setView('welcome')} onDone={(u) => onDone(u, false)} onReset={() => setView('reset')} />;
-  if (view === 'reset') return <Reset onBack={() => setView('login')} />;
-  if (view === 'confirm')
-    return (
-      <Page onBack={() => setView('login')} title="E-Mail bestätigen">
-        <div className="stack">
-          <Icon name="mail" size={32} />
-          <h1 className="t-h2">Schau in dein Postfach</h1>
-          <p>Wir haben dir einen Link geschickt. Tippe darauf, dann kannst du dich anmelden.</p>
-          <button className="btn btn-primary btn-block" onClick={() => setView('login')}>Zur Anmeldung</button>
-        </div>
-      </Page>
-    );
+  const confirm = (mail: string) => {
+    setEmail(mail);
+    setView('confirm');
+  };
+  if (view === 'register') return <Register onBack={() => setView('welcome')} onDone={onDone} onConfirm={confirm} />;
+  if (view === 'login') return <Login onBack={() => setView('welcome')} onDone={(u) => onDone(u, false)} onReset={() => setView('reset')} onConfirm={confirm} />;
+  if (view === 'reset') return <Reset onBack={() => setView('login')} onDone={(u) => onDone(u, false)} />;
+  if (view === 'confirm') return <ConfirmEmail email={email} onBack={() => setView('login')} onDone={(u) => onDone(u, true)} />;
 
   return (
     <div className="welcome">
@@ -64,7 +59,7 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
 
 const USERNAME = /^[A-Za-z0-9._]{3,24}$/;
 
-function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (u: User, isNew: boolean) => void; onConfirm: () => void }) {
+function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (u: User, isNew: boolean) => void; onConfirm: (email: string) => void }) {
   const [f, setF] = useState({ firstName: '', lastName: '', username: '', birthDate: '', city: '', email: '', password: '' });
   const [avatar, setAvatar] = useState<{ blob: Blob; url: string } | null>(null);
   const [consent, setConsent] = useState(false);
@@ -107,7 +102,7 @@ function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (
           setError(null);
           try {
             const r = await api.signUp({ ...f, username: f.username.trim(), email: f.email.trim(), avatar: avatar?.blob });
-            if (r.needsConfirmation) onConfirm();
+            if (r.needsConfirmation) onConfirm(f.email.trim());
             else onDone((await api.currentUser())!, true);
           } catch (err) {
             setError((err as Error).message);
@@ -149,11 +144,12 @@ function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (
   );
 }
 
-function Login({ onBack, onDone, onReset }: { onBack: () => void; onDone: (u: User) => void; onReset: () => void }) {
+function Login({ onBack, onDone, onReset, onConfirm }: { onBack: () => void; onDone: (u: User) => void; onReset: () => void; onConfirm: (email: string) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const unconfirmed = !!error && /bestätige/.test(error);
   return (
     <Page onBack={onBack} title="Anmelden">
       <form
@@ -173,6 +169,23 @@ function Login({ onBack, onDone, onReset }: { onBack: () => void; onDone: (u: Us
         <Field label="E-Mail">{(id) => <input id={id} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" required />}</Field>
         <Field label="Passwort">{(id) => <input id={id} className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />}</Field>
         {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
+        {unconfirmed && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-block"
+            style={{ marginTop: 12 }}
+            onClick={async () => {
+              try {
+                await api.resendEmailCode(email.trim());
+              } catch {
+                /* Code eventuell schon unterwegs; trotzdem zur Eingabe */
+              }
+              onConfirm(email.trim());
+            }}
+          >
+            Code zum Bestätigen schicken
+          </button>
+        )}
         <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy || !email || !password}>{busy ? 'Anmelden …' : 'Anmelden'}</button>
         <button type="button" className="btn btn-text btn-block" style={{ marginTop: 12 }} onClick={onReset}>Passwort vergessen?</button>
       </form>
@@ -180,23 +193,47 @@ function Login({ onBack, onDone, onReset }: { onBack: () => void; onDone: (u: Us
   );
 }
 
-function Reset({ onBack }: { onBack: () => void }) {
+function Reset({ onBack, onDone }: { onBack: () => void; onDone: (u: User) => void }) {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   return (
     <Page onBack={onBack} title="Passwort zurücksetzen">
       {sent ? (
-        <div className="stack">
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setError(null);
+            try {
+              onDone(await api.resetPasswordWithCode(email.trim(), code, password));
+            } catch (err) {
+              setError((err as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
           <Icon name="mail" size={32} />
-          <h1 className="t-h2">Link verschickt</h1>
-          <p>Gibt es ein Konto zu {email}, bekommst du gleich eine E-Mail mit einem Link zum neuen Passwort.</p>
-          <button className="btn btn-primary btn-block" onClick={onBack}>Zur Anmeldung</button>
-        </div>
+          <h1 className="t-h2" style={{ marginTop: 12 }}>Code eingeben</h1>
+          <p style={{ margin: '8px 0 20px' }}>Gibt es ein Konto zu {email}, bekommst du gleich eine E-Mail mit einem Code. Gib ihn hier ein und wähle ein neues Passwort.</p>
+          <CodeField value={code} onChange={setCode} />
+          <Field label="Neues Passwort" hint="Mindestens 8 Zeichen.">
+            {(id, d) => <input id={id} aria-describedby={d} className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />}
+          </Field>
+          {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
+          <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy || code.length < 6 || password.length < 8}>
+            {busy ? 'Wird gespeichert …' : 'Passwort speichern'}
+          </button>
+        </form>
       ) : (
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            setError(null);
             try {
               await api.resetPassword(email.trim());
               setSent(true);
@@ -205,12 +242,96 @@ function Reset({ onBack }: { onBack: () => void }) {
             }
           }}
         >
-          <p style={{ marginBottom: 20 }}>Gib deine E-Mail-Adresse ein. Wir schicken dir einen Link.</p>
-          <Field label="E-Mail">{(id) => <input id={id} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />}</Field>
+          <p style={{ marginBottom: 20 }}>Gib deine E-Mail-Adresse ein. Wir schicken dir einen Code.</p>
+          <Field label="E-Mail">{(id) => <input id={id} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" required />}</Field>
           {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
-          <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={!email}>Link schicken</button>
+          <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={!email}>Code schicken</button>
         </form>
       )}
+    </Page>
+  );
+}
+
+/** Feld für den 6- bis 8-stelligen Code aus der E-Mail; iOS schlägt ihn aus der Mail-App vor. */
+function CodeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <Field label="Code aus der E-Mail">
+      {(id) => (
+        <input
+          id={id}
+          className="input"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="[0-9]*"
+          maxLength={8}
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 8))}
+          style={{ fontSize: 28, letterSpacing: 8, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
+          autoFocus
+        />
+      )}
+    </Field>
+  );
+}
+
+/** A3: E-Mail bestätigen mit Code, damit man in der Home-Bildschirm-App bleibt statt im Browser zu landen. */
+function ConfirmEmail({ email, onBack, onDone }: { email: string; onBack: () => void; onDone: (u: User) => void }) {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [wait, setWait] = useState(60);
+  useEffect(() => {
+    if (wait <= 0) return;
+    const t = setTimeout(() => setWait(wait - 1), 1000);
+    return () => clearTimeout(t);
+  }, [wait]);
+  async function submit(c = code) {
+    if (c.length < 6 || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      onDone(await api.verifyEmailCode(email, c));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Page onBack={onBack} title="E-Mail bestätigen">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <Icon name="mail" size={32} />
+        <h1 className="t-h2" style={{ marginTop: 12 }}>Schau in dein Postfach</h1>
+        <p style={{ margin: '8px 0 20px' }}>Wir haben dir einen Code an <strong>{email}</strong> geschickt. Gib ihn hier ein, dann bist du drin.</p>
+        <CodeField value={code} onChange={setCode} />
+        {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
+        <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy || code.length < 6}>
+          {busy ? 'Wird geprüft …' : 'Bestätigen'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-text btn-block"
+          style={{ marginTop: 12 }}
+          disabled={wait > 0}
+          onClick={async () => {
+            setError(null);
+            try {
+              await api.resendEmailCode(email);
+              setWait(60);
+            } catch (err) {
+              setError((err as Error).message);
+            }
+          }}
+        >
+          {wait > 0 ? `Neuen Code in ${wait} s anfordern` : 'Neuen Code anfordern'}
+        </button>
+        <p className="t-caption muted" style={{ marginTop: 16 }}>Keine Mail? Schau im Spam-Ordner nach. Den Link in der Mail brauchst du nicht.</p>
+      </form>
     </Page>
   );
 }

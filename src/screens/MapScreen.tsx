@@ -162,6 +162,9 @@ export function MapScreen() {
             </button>
           </Notice>
         )}
+        {location.status === 'asking' && !location.simulated && (
+          <Notice icon="location">Standort wird bestimmt … Erlaube den Zugriff, wenn dein iPhone fragt.</Notice>
+        )}
         {location.status === 'off' && !location.simulated && (
           <Notice icon="location">
             Für den Check-in braucht die App deinen Standort, nur solange sie offen ist.{' '}

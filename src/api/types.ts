@@ -138,6 +138,10 @@ export interface Api {
   signIn(email: string, password: string): Promise<User>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
+  /** E-Mail mit dem Code aus der Mail bestätigen; bleibt in der App statt im Browser. */
+  verifyEmailCode(email: string, code: string): Promise<User>;
+  resendEmailCode(email: string): Promise<void>;
+  resetPasswordWithCode(email: string, code: string, password: string): Promise<User>;
   deleteAccount(): Promise<void>;
   isUsernameFree(username: string): Promise<boolean>;
   updateProfile(patch: Partial<Pick<User, 'firstName' | 'lastName' | 'city'>> & { avatar?: Blob }): Promise<User>;

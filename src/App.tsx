@@ -9,7 +9,8 @@ import { FriendsScreen, UserProfile } from './screens/FriendScreens';
 import { MapScreen } from './screens/MapScreen';
 import { EditProfile, LocationHelp, PrivacyScreen, ProfileScreen } from './screens/ProfileScreens';
 import { AddPub, PubDetail, ReviewQueue, SearchScreen } from './screens/PubScreens';
-import { useApp, type Route, type Tab } from './state/app';
+import { load } from './lib/storage';
+import { LOCATION_ASKED, useApp, type Route, type Tab } from './state/app';
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'map', label: 'Karte', icon: 'map' },
@@ -35,7 +36,8 @@ function RouteView({ r }: { r: Route }) {
 
 export function App() {
   const app = useApp();
-  const [onboarding, setOnboarding] = useState(false);
+  // A4: Standort-Erklärung beim Öffnen, bis einmal gefragt wurde; „Später“ gilt nur für diese Sitzung
+  const [onboarding, setOnboarding] = useState(() => !load(LOCATION_ASKED, false));
   const [requests, setRequests] = useState(0);
 
   useEffect(() => {
@@ -50,11 +52,11 @@ export function App() {
         onDone={(u, isNew) => {
           app.setUser(u);
           app.setTab('map');
-          setOnboarding(isNew && !app.location.simulated);
+          if (isNew) app.notify(`Willkommen, ${u.firstName}.`, 'success');
         }}
       />
     );
-  } else if (onboarding) {
+  } else if (onboarding && !app.location.simulated && app.location.status === 'off') {
     body = (
       <LocationOnboarding
         onAllow={() => {

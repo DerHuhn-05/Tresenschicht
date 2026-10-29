@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type CheckIn, type CollectionEntry } from '../api';
 import { Icon, type IconName } from '../components/Icon';
-import { Avatar, Confirm, Field, Page, PhotoPicker, Spinner } from '../components/ui';
+import { Avatar, Confirm, Field, Notice, Page, PhotoPicker, Spinner } from '../components/ui';
 import { remove } from '../lib/storage';
 import { isDemo, useApp } from '../state/app';
 import { cityCount, VisitCard } from './CollectionScreens';
@@ -201,26 +201,61 @@ export function PrivacyScreen() {
 export function LocationHelp() {
   const app = useApp();
   const s = app.location.status;
+  const blocked = s === 'denied' || s === 'unavailable';
   return (
     <Page onBack={app.pop} title="Standort">
       <div className="stack">
-        <Icon name={s === 'denied' ? 'location-off' : 'location'} size={32} />
-        <h1 className="t-h2">Wofür die App deinen Standort braucht</h1>
-        <p>Nur für den Check-in: Beim Öffnen schaut die App, ob du in einer Kneipe bist, und fragt dich dann. Der Standort wird nicht gespeichert und nie anderen gezeigt.</p>
-        {s === 'denied' && (
+        <Icon name={blocked ? 'location-off' : 'location'} size={32} />
+        <h1 className="t-h2">{blocked ? 'Standort freigeben' : 'Wofür die App deinen Standort braucht'}</h1>
+        <p>
+          Nur für den Check-in: Beim Öffnen schaut die App, ob du in einer Kneipe bist, und fragt dich dann. Der Standort wird
+          nicht gespeichert und nie anderen gezeigt.
+        </p>
+        {s === 'ok' && (
+          <Notice icon="success">
+            Der Standort ist freigegeben{app.location.accuracy ? `, Genauigkeit etwa ${Math.round(app.location.accuracy)} m` : ''}.
+          </Notice>
+        )}
+        {blocked && (
           <>
-            <h2 className="t-h3" style={{ marginTop: 24 }}>Standort wieder erlauben</h2>
-            <ol style={{ paddingLeft: 20, margin: 0 }}>
-              <li>Öffne die Einstellungen deines iPhones.</li>
-              <li>Tippe auf Datenschutz &amp; Sicherheit, dann Ortungsdienste.</li>
-              <li>Wähle Safari-Websites und stell „Beim Verwenden der App“ ein.</li>
-              <li>Öffne die Kneipen-App neu.</li>
-            </ol>
+            <Notice icon="warning">
+              {s === 'denied'
+                ? 'Dein iPhone hat den Zugriff auf den Standort abgelehnt. So erlaubst du ihn wieder:'
+                : 'Dein iPhone liefert gerade keinen Standort. Prüf diese Einstellungen:'}
+            </Notice>
+            <h2 className="t-h3" style={{ marginTop: 8 }}>1. Ortungsdienste</h2>
+            <p>
+              Einstellungen → <strong>Datenschutz &amp; Sicherheit</strong> → <strong>Ortungsdienste</strong>: oben einschalten. Weiter unten in der
+              Liste <strong>Safari-Websites</strong> antippen → <strong>Beim Verwenden der App</strong> wählen und <strong>Genauer Standort</strong>{' '}
+              einschalten.
+            </p>
+            <h2 className="t-h3" style={{ marginTop: 8 }}>2. Safari</h2>
+            <p>
+              Einstellungen → <strong>Apps</strong> → <strong>Safari</strong> (bei älterem iOS direkt <strong>Safari</strong>) → ganz unten
+              unter „Einstellungen für Websites“ → <strong>Standort</strong> → <strong>Fragen</strong> oder <strong>Erlauben</strong>.
+            </p>
+            <h2 className="t-h3" style={{ marginTop: 8 }}>3. App neu öffnen</h2>
+            <p>
+              Die App ganz schließen (vom unteren Rand nach oben wischen und die App nach oben wegschieben) und vom Home-Bildschirm neu
+              öffnen. Dann fragt dein iPhone noch einmal.
+            </p>
           </>
         )}
-        <p className="muted t-secondary">Auf dem iPhone fragt die Web-App bei jedem Öffnen neu nach dem Standort. Das ist eine Vorgabe von iOS.</p>
-        <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} onClick={() => { app.requestLocation(); app.pop(); }}>
-          Standort erlauben
+        {!blocked && s !== 'ok' && (
+          <p className="muted t-secondary">
+            Dein iPhone fragt gleich: „Tresenschicht möchte deinen Standort verwenden“. Wähle <strong>Erlauben</strong>. Auf dem iPhone
+            fragt eine Web-App bei jedem Öffnen neu, das ist eine Vorgabe von iOS.
+          </p>
+        )}
+        <button
+          className="btn btn-primary btn-block"
+          style={{ marginTop: 24 }}
+          onClick={() => {
+            app.requestLocation();
+            app.pop();
+          }}
+        >
+          {blocked ? 'Noch einmal versuchen' : s === 'ok' ? 'Standort aktualisieren' : 'Standort erlauben'}
         </button>
       </div>
     </Page>

@@ -4,9 +4,9 @@ import { GPS_ALLOWANCE_M, LOCK_MINUTES, MAX_ACCURACY_M, RADIUS_M, SAME_PUB_HOURS
 import { load, save } from '../lib/storage';
 import { CELLS_PER_TILE, DETAIL_ZOOM, latToTileY, lonToTileX } from '../lib/tiles';
 import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
-import { searchFilter } from './search';
+import { groupFriends, searchFilter } from './search';
 import type {
-  Api, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, User,
+  Api, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, FriendAtPub, ReviewLinkEdit, ReviewNews, User,
 } from './types';
 import { t } from '../lib/i18n';
 
@@ -296,7 +296,7 @@ export class DemoApi implements Api {
     const hits = this.db.pubs
       .filter((p) => p.status === 'aktiv' && words.every((w) => `${p.name} ${p.city} ${p.address}`.toLowerCase().includes(w)))
       .filter((p) => features.every((f) => p.features?.[f]) && (!types.length || types.includes(p.type)));
-    if (!q && near) hits.sort((a, b) => distanceM(near, a) - distanceM(near, b));
+    if (near) hits.sort((a, b) => distanceM(near, a) - distanceM(near, b)); // mit Standort: die nächsten zuerst
     return this.wait(hits.slice(0, 40));
   }
 
@@ -541,6 +541,11 @@ export class DemoApi implements Api {
       .filter((f) => f.status === 'angenommen' && (f.from === me || f.to === me))
       .map((f) => (f.from === me ? f.to : f.from));
     return this.wait(this.db.users.filter((u) => ids.includes(u.id)).map((u) => this.profileOf(u)));
+  }
+
+  async friendsAtPub(pubId: string): Promise<FriendAtPub[]> {
+    const friends = new Map((await this.friends()).map((f) => [f.id, f]));
+    return this.wait(groupFriends(this.db.checkins.filter((c) => c.pubId === pubId && friends.has(c.userId)), friends));
   }
 
   async feed(): Promise<FeedItem[]> {

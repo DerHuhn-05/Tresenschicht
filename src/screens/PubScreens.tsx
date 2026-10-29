@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api, type CheckIn, type Pub, type PubCategory, type PubFeature, type PubType, type ReportItem } from '../api';
+import { api, type CheckIn, type FriendAtPub, type Pub, type PubCategory, type PubFeature, type PubType, type ReportItem } from '../api';
 import { Icon, type IconName } from '../components/Icon';
-import { Confirm, Field, Notice, Page, PhotoPicker, Spinner } from '../components/ui';
-import { formatDate, formatDistance, PUB_TYPE_LABEL, relativeTime } from '../lib/format';
+import { Avatar, Confirm, Field, Notice, Page, PhotoPicker, Sheet, Spinner } from '../components/ui';
+import { formatDate, formatDistance, plural, PUB_TYPE_LABEL, relativeTime } from '../lib/format';
 import { distanceM, type LatLon } from '../lib/geo';
 import { GPS_ALLOWANCE_M, MAX_ACCURACY_M, RADIUS_M, REFUSAL_TEXT } from '../lib/rules';
 import { PubMap } from '../map/LazyMap';
@@ -31,6 +31,9 @@ const CATEGORIES: { id: PubCategory; label: string; icon: IconName }[] = [
   { id: 'biergarten', label: t('Biergarten'), icon: 'biergarten' },
 ];
 
+/** „Check-in“ nicht am Bindestrich umbrechen */
+const nobreak = (s: string) => s.replace(/-/g, '\u2011');
+
 export function PubDetail({ id }: { id: string }) {
   const app = useApp();
   const [pub, setPub] = useState<Pub | null | undefined>(undefined);
@@ -38,10 +41,13 @@ export function PubDetail({ id }: { id: string }) {
   const [edit, setEdit] = useState(false);
   const [closedAsk, setClosedAsk] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [friends, setFriends] = useState<FriendAtPub[]>([]);
+  const [friendsSheet, setFriendsSheet] = useState(false);
 
   useEffect(() => {
     api.getPub(id).then(setPub);
     api.checkIns(undefined, id).then(setVisits);
+    api.friendsAtPub(id).then(setFriends).catch(() => setFriends([]));
     api.bookmarks().then((b) => setSaved(b.some((p) => p.id === id))).catch(() => {});
   }, [id, app.version]);
 
@@ -57,6 +63,38 @@ export function PubDetail({ id }: { id: string }) {
         <Icon name={typeIcon(pub.type)} size={32} />
       </div>
       <h1 className="t-h1">{pub.name}</h1>
+      {/* Hast du die Kneipe schon? Gesammelt hervorgehoben, sonst gedämpft */}
+      <p className={`collect-state${visits.length ? ' is-collected' : ''}`}>
+        <Icon name={visits.length ? 'checkin' : 'pin'} size={18} muted={!visits.length} />
+        {visits.length ? t('In deiner Sammlung') : t('Noch nicht besucht')}
+      </p>
+
+      <div className="pub-stats">
+        <div className="pub-stat">
+          <Icon name="route" size={20} />
+          <span className="n">{dist !== null ? formatDistance(dist) : '–'}</span>
+          <span className="l">{t('Entfernung')}</span>
+        </div>
+        <div className={`pub-stat${visits.length ? ' is-hot' : ''}`}>
+          <Icon name="checkin" size={20} muted={!visits.length} />
+          <span className="n">{visits.length}</span>
+          <span className="l">{nobreak(t(visits.length === 1 ? 'Dein Check-in' : 'Deine Check-ins'))}</span>
+        </div>
+        {friends.length > 0 ? (
+          <button className="pub-stat" onClick={() => setFriendsSheet(true)} aria-label={t('{n} Freunde waren hier. Liste zeigen', { n: friends.length })}>
+            <Icon name="friends" size={20} />
+            <span className="n">{friends.length}</span>
+            <span className="l">{t(friends.length === 1 ? 'Freund war hier' : 'Freunde waren hier')}</span>
+          </button>
+        ) : (
+          <div className="pub-stat">
+            <Icon name="friends" size={20} muted />
+            <span className="n">0</span>
+            <span className="l">{t('Freunde waren hier')}</span>
+          </div>
+        )}
+      </div>
+
       <dl className="info-rows">
         <div className="info-row">
           <Icon name="pin" size={22} />
@@ -64,7 +102,6 @@ export function PubDetail({ id }: { id: string }) {
             <dt>{t('Adresse')}:</dt>
             <dd>
               {[pub.address, pub.city].filter(Boolean).join(', ') || '–'}
-              {dist !== null && <span className="info-extra"> · {t('{d} entfernt', { d: formatDistance(dist) })}</span>}
             </dd>
           </div>
         </div>
@@ -97,7 +134,7 @@ export function PubDetail({ id }: { id: string }) {
       )}
 
       <div style={{ height: 180, position: 'relative', marginTop: 20, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
-        <PubMap pubs={[pub]} selectedId={pub.id} initialCenter={pub} initialZoom={16} userPos={app.location.pos} label={t('Karte: {name}', { name: pub.name })} />
+        <PubMap pubs={[pub]} collected={visits.length ? new Set([pub.id]) : undefined} selectedId={pub.id} initialCenter={pub} initialZoom={16} userPos={app.location.pos} label={t('Karte: {name}', { name: pub.name })} />
       </div>
 
       <div className="btn-stack" style={{ marginTop: 20 }}>
@@ -175,6 +212,25 @@ export function PubDetail({ id }: { id: string }) {
       </p>
 
       {edit && <EditPub pub={pub} onClose={() => setEdit(false)} />}
+      {friendsSheet && (
+        <Sheet label={t('Freunde, die hier waren')} onClose={() => setFriendsSheet(false)}>
+          <h2 className="t-h2" tabIndex={-1} style={{ marginBottom: 16 }}>{t('Freunde, die hier waren')}</h2>
+          <ul className="list">
+            {friends.map((f) => (
+              <li key={f.user.id}>
+                <button className="list-row" onClick={() => { setFriendsSheet(false); app.push({ kind: 'user', id: f.user.id }); }}>
+                  <Avatar url={f.user.avatarUrl} name={f.user.username} size="sm" />
+                  <div className="grow">
+                    <div className="title">{f.user.firstName ? `${f.user.firstName} ${f.user.lastName ?? ''}`.trim() : `@${f.user.username}`}</div>
+                    <div className="sub">{plural(f.visits, 'Check-in', 'Check-ins')} · {relativeTime(f.lastAt)}</div>
+                  </div>
+                  <span className="chev"><Icon name="chevron-right" /></span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Sheet>
+      )}
       {closedAsk && (
         <Confirm
           title={t('Geschlossen melden?')}

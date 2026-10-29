@@ -127,6 +127,12 @@ export interface NewPubProposal {
 }
 
 /** Rückmeldung zu einem eigenen Vorschlag, der inzwischen geprüft wurde */
+export interface FriendAtPub {
+  user: PublicProfile;
+  visits: number;
+  lastAt: string;
+}
+
 export interface ReviewNews {
   id: string;
   kind: PubEdit['kind'];
@@ -262,6 +268,8 @@ export interface Api {
   removeFriend(userId: string): Promise<void>;
   friendRequests(): Promise<FriendRequest[]>;
   friends(): Promise<PublicProfile[]>;
+  /** Freunde, die schon in dieser Kneipe eingecheckt haben (meiste Check-ins zuerst) */
+  friendsAtPub(pubId: string): Promise<FriendAtPub[]>;
   feed(): Promise<FeedItem[]>;
   reportContent(checkinId: string, reason: string): Promise<void>;
   blockUser(userId: string): Promise<void>;

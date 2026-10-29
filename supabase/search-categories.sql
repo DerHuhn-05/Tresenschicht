@@ -1,7 +1,8 @@
 -- Suche nach Kategorien (Kneipe, Raucherkneipe, Bar, Biergarten) und Ausstattung.
 -- Einmal im SQL-Editor ausführen. Kann gefahrlos mehrfach ausgeführt werden.
 --
--- Ohne Suchtext, aber mit Standort: die nächsten Treffer der gewählten Kategorie in der Nähe.
+-- Mit Standort sortiert die Suche nach Entfernung (die nächsten zuerst). Ohne Suchtext, aber mit Standort:
+-- die nächsten Treffer der gewählten Kategorie in der Nähe.
 -- Raucherkneipe = Ausstattung „smoking“ (OSM: smoking=yes/dedicated/isolated), kommt mit dem nächsten Import.
 
 drop function if exists public.search_pubs(text, text[]);
@@ -20,9 +21,10 @@ language sql stable set search_path = public, extensions as $$
       or (select bool_and((p.name || ' ' || p.city || ' ' || p.address) ilike '%' || w || '%') from unnest(string_to_array(trim(q), ' ')) w)
     )
     and (length(trim(coalesce(q, ''))) > 0 or p_lat is not null)
+  -- mit Standort: die nächsten zuerst; ohne Standort: die besten Namenstreffer zuerst
   order by
-    case when length(trim(coalesce(q, ''))) > 0 then -similarity(p.name || ' ' || p.city, q) end,
-    case when p_lat is not null then p.geom <-> st_setsrid(st_makepoint(p_lon, p_lat), 4326)::geography end
+    case when p_lat is not null then p.geom <-> st_setsrid(st_makepoint(p_lon, p_lat), 4326)::geography end,
+    case when length(trim(coalesce(q, ''))) > 0 then -similarity(p.name || ' ' || p.city, q) end
   limit 40;
 $$;
 

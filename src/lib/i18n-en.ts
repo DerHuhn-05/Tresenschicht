@@ -464,4 +464,12 @@ export const EN: Record<string, string> = {
   "Hinweis ausblenden": "Hide notice",
   "Gib einen Namen oder eine Stadt ein. Ohne Suchtext zeigt die Kategorie die nächsten Treffer, sobald dein Standort bekannt ist.": "Enter a name or a city. Without text, the category shows the nearest results as soon as your location is known.",
   "Suche nach Name und Stadt oder wähle eine Kategorie für Treffer in deiner Nähe. Kategorie und Ausstattung zeigen nur Kneipen, bei denen das in OpenStreetMap eingetragen ist.": "Search by name and city, or choose a category for results near you. Category and amenities only show pubs where this is listed in OpenStreetMap.",
+  "In deiner Sammlung": "In your collection",
+  "Noch nicht besucht": "Not visited yet",
+  "Entfernung": "Distance",
+  "Dein Check-in": "Your check-in",
+  "{n} Freunde waren hier. Liste zeigen": "{n} friends have been here. Show list",
+  "Freund war hier": "friend was here",
+  "Freunde waren hier": "friends were here",
+  "Freunde, die hier waren": "Friends who have been here",
 };

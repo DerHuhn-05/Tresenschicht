@@ -1,10 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { LatLon } from '../lib/geo';
 import type {
-  Api, Bounds, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, SignUpData, User,
+  Api, Bounds, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, FriendAtPub, ReviewLinkEdit, ReviewNews, SignUpData, User,
 } from './types';
 import { t } from '../lib/i18n';
-import { searchFilter } from './search';
+import { groupFriends, searchFilter } from './search';
 
 // Echtes Backend (supabase/schema.sql). Alle Regeln prüft der Server; die App zeigt nur an.
 type Row = Record<string, any>;
@@ -425,6 +425,14 @@ export class SupabaseApi implements Api {
       id: r.id, username: r.username, avatarUrl: this.avatarUrl(r.avatar_path), friendship: 'friends' as const,
       firstName: r.first_name, lastName: r.last_name, city: r.city,
     }));
+  }
+
+  async friendsAtPub(pubId: string): Promise<FriendAtPub[]> {
+    // RLS: Check-ins sieht man nur von sich und von Freunden
+    const rows = must(await this.sb.from('checkins').select('user_id, created_at').eq('pub_id', pubId).neq('user_id', this.uid())) as Row[];
+    if (!rows.length) return [];
+    const friends = new Map((await this.friends()).map((f) => [f.id, f]));
+    return groupFriends(rows.map((r) => ({ userId: r.user_id, at: r.created_at })), friends);
   }
 
   async feed(): Promise<FeedItem[]> {

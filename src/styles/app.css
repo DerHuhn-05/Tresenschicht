@@ -1373,3 +1373,54 @@ textarea.input {
 }
 .category-chips .chip { justify-content: flex-start; min-height: 48px; }
 .chips-small .chip { padding: 0 var(--space-3); font-size: 14px; }
+
+/* Kneipenseite: gesammelt oder nicht, dazu drei Kennzahlen */
+.collect-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-2);
+  padding: 4px 12px 4px 8px;
+  border-radius: var(--radius-full);
+  border: var(--stroke-hairline) solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.collect-state.is-collected {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.collect-state.is-collected svg { --accent: var(--on-accent); }
+.pub-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.pub-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: var(--stroke-hairline) solid var(--border-subtle);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+button.pub-stat { cursor: pointer; }
+.pub-stat svg { margin-bottom: var(--space-1); }
+.pub-stat .n { font-size: 22px; line-height: 28px; font-weight: 800; white-space: nowrap; }
+.pub-stat .l { font-size: 13px; line-height: 17px; color: var(--text-muted); }
+/* ab einem Check-in hervorgehoben */
+.pub-stat.is-hot {
+  background: linear-gradient(135deg, rgba(245, 163, 26, 0.22), rgba(245, 163, 26, 0.06));
+  border-color: rgba(245, 163, 26, 0.6);
+}
+.pub-stat.is-hot .n { color: var(--text-accent); }

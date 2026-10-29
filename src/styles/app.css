@@ -629,9 +629,35 @@ textarea.input {
   font-weight: 600;
   cursor: pointer;
 }
+.tab {
+  z-index: 1;
+  transition: color 240ms ease;
+}
+.tab svg {
+  transition: transform 320ms cubic-bezier(0.3, 1.4, 0.5, 1);
+}
 .tab[aria-current='page'] {
   color: var(--text);
+}
+.tab[aria-current='page'] svg {
+  transform: translateY(-1px) scale(1.08);
+}
+/* Markierung gleitet mit leichtem Nachfedern zum gewählten Tab (--i = Position 0–3) */
+.tab-indicator {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc((100% - 12px - 3 * var(--space-1)) / 4);
+  border-radius: var(--radius-full);
   background: rgba(255, 255, 255, 0.12);
+  transform: translateX(calc(var(--i, 0) * (100% + var(--space-1))));
+  transition: transform 420ms cubic-bezier(0.32, 1.25, 0.45, 1);
+  pointer-events: none;
+}
+:root[data-theme='contrast'] .tab-indicator {
+  background: var(--surface-raised, rgba(255, 255, 255, 0.2));
+  border: var(--stroke-hairline) solid var(--border);
 }
 .tab .badge {
   position: absolute;
@@ -1096,6 +1122,32 @@ textarea.input {
   object-fit: cover;
   background: var(--gray-100);
 }
+/* Angaben einer Kneipe: Icon, Bezeichnung mit Doppelpunkt, darunter der Wert */
+.info-rows {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+}
+.info-row {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+.info-row svg { margin-top: 1px; color: var(--text-muted); }
+.info-row dt {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.info-row dd {
+  margin: 2px 0 0;
+  font-size: 17px;
+  line-height: 24px;
+  color: var(--text);
+}
+.info-extra { color: var(--text-muted); }
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -1245,3 +1297,45 @@ textarea.input {
   cursor: pointer;
 }
 .check-row input { flex: none; width: 22px; height: 22px; margin-top: 1px; accent-color: var(--accent); }
+
+/* ---------------------------------------------------------------------------
+   Anpassung an die iPhone-Größen
+   schmal (≤ 380 px): iPhone SE, 12/13 mini, ältere 6/7/8
+   normal (381–419 px): iPhone 12–16, Pro
+   groß (≥ 420 px): Plus und Pro Max
+   niedrig (≤ 700 px Höhe): iPhone SE und ältere Modelle mit Home-Taste
+   --------------------------------------------------------------------------- */
+.tab span:not(.badge) {
+  white-space: nowrap;
+}
+@media (max-width: 380px) {
+  .screen {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  .t-display { font-size: 34px; line-height: 38px; }
+  .t-h1 { font-size: 28px; line-height: 34px; }
+  .tab { font-size: 11px; }
+  .tabbar { left: var(--space-3); right: var(--space-3); }
+  .stats { gap: var(--space-2); }
+  .stat { padding: var(--space-3) var(--space-2) var(--space-3) var(--space-3); }
+  .stat .n { font-size: 24px; line-height: 28px; }
+  .stat .muted { font-size: 13px; line-height: 18px; }
+  .stat-hero .n { font-size: 38px; line-height: 42px; }
+  .stat-hero-icon { width: 48px; height: 48px; }
+}
+@media (min-width: 420px) {
+  .screen {
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+  .tabbar { left: var(--space-5); right: var(--space-5); }
+}
+@media (max-height: 700px) {
+  :root { --tabbar-height: 58px; }
+  .welcome { gap: var(--space-4); padding-top: calc(env(safe-area-inset-top) + var(--space-6)); }
+  .welcome-mark { width: 56px; height: 56px; }
+  .welcome .lead { margin-top: var(--space-2); }
+  .welcome .btn-stack > * + * { margin-top: var(--space-2); }
+  .section { margin-top: var(--space-6); }
+}

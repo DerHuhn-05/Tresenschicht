@@ -46,14 +46,27 @@ export function PubDetail({ id }: { id: string }) {
         <Icon name={typeIcon(pub.type)} size={32} />
       </div>
       <h1 className="t-h1">{pub.name}</h1>
-      <div className="meta">
-        <span>
-          <Icon name="pin" size={20} />
-          {[pub.address, pub.city].filter(Boolean).join(', ')}
-        </span>
-        {dist !== null && <span>{t('{d} entfernt', { d: formatDistance(dist) })}</span>}
-      </div>
-      {pub.openingHours && <p className="t-secondary muted" style={{ marginTop: 8 }}>{t('Öffnungszeiten')}: {pub.openingHours}</p>}
+      <dl className="info-rows">
+        <div className="info-row">
+          <Icon name="pin" size={22} />
+          <div>
+            <dt>{t('Adresse')}:</dt>
+            <dd>
+              {[pub.address, pub.city].filter(Boolean).join(', ') || '–'}
+              {dist !== null && <span className="info-extra"> · {t('{d} entfernt', { d: formatDistance(dist) })}</span>}
+            </dd>
+          </div>
+        </div>
+        {pub.openingHours && (
+          <div className="info-row">
+            <Icon name="calendar" size={22} />
+            <div>
+              <dt>{t('Öffnungszeiten')}:</dt>
+              <dd>{pub.openingHours}</dd>
+            </div>
+          </div>
+        )}
+      </dl>
       {FEATURES.some((f) => pub.features?.[f]) && (
         <ul className="chips" style={{ marginTop: 12, padding: 0, listStyle: 'none' }} aria-label={t('Ausstattung')}>
           {FEATURES.filter((f) => pub.features?.[f]).map((f) => (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { api } from './api';
 import { Icon, type IconName } from './components/Icon';
 import { Toast } from './components/ui';
@@ -97,7 +97,9 @@ export function App() {
         {app.tab === 'collection' && <CollectionScreen />}
         {app.tab === 'friends' && <FriendsScreen />}
         {app.tab === 'profile' && <ProfileScreen />}
-        <nav className="tabbar" aria-label={t('Hauptnavigation')}>
+        <nav className="tabbar" aria-label={t('Hauptnavigation')} style={{ '--i': TABS.findIndex((x) => x.id === app.tab) } as CSSProperties}>
+          {/* gleitende Markierung hinter dem gewählten Tab */}
+          <span className="tab-indicator" aria-hidden="true" />
           {TABS.map((tab) => {
             const on = app.tab === tab.id;
             return (

@@ -78,7 +78,7 @@ export function CollectionScreen() {
 
   return (
     <div className="screen">
-      <h1 className="t-h1">Meine Kneipen</h1>
+      <h1 className="t-display page-title">Meine Kneipen</h1>
       {!entries ? <Spinner /> : entries.length === 0 ? (
         <Empty
           icon="collection"
@@ -88,7 +88,7 @@ export function CollectionScreen() {
         />
       ) : (
         <>
-          <div className="stats" style={{ margin: '20px 0 24px' }}>
+          <div className="stats" style={{ marginBottom: 24 }}>
             <div className="stat big"><div className="n">{entries.length}</div><div className="muted">{entries.length === 1 ? 'Kneipe' : 'Kneipen'}</div></div>
             <div className="stat"><div className="n">{visits}</div><div className="muted">{visits === 1 ? 'Besuch' : 'Besuche'}</div></div>
             <div className="stat"><div className="n">{cityCount(entries)}</div><div className="muted">{cityCount(entries) === 1 ? 'Stadt' : 'Städte'}</div></div>

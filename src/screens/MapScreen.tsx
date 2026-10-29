@@ -141,7 +141,7 @@ export function MapScreen() {
             </button>
           </Notice>
         )}
-        {hint === 'area' && <Notice>Check-ins gehen nur in Deutschland, seinen Nachbarländern und Italien. Die Karte kannst du überall ansehen.</Notice>}
+        {hint === 'area' && <Notice>Check-ins gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien. Die Karte kannst du überall ansehen.</Notice>}
         {(location.status === 'denied' || location.status === 'unavailable') && !location.simulated && (
           <Notice icon="location-off">
             Kein Standort. Öffne die Einstellungen und erlaube den Zugriff, während die App geöffnet ist.{' '}
@@ -204,7 +204,7 @@ export function MapScreen() {
       )}
 
       {view === 'map' && (
-        <div className="map-bottom" style={{ bottom: 24 }}>
+        <div className="map-bottom" style={{ bottom: 'calc(var(--tabbar-space) + 4px)' }}>
           <button className="fab" onClick={() => app.push({ kind: 'addPub', pos: location.pos ?? center })}>
             <Icon name="pin-add" />
             Kneipe fehlt?

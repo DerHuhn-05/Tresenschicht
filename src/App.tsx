@@ -14,7 +14,7 @@ import { LOCATION_ASKED, useApp, type Route, type Tab } from './state/app';
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'map', label: 'Karte', icon: 'map' },
-  { id: 'collection', label: 'Meine Kneipen', icon: 'collection' },
+  { id: 'collection', label: 'Check-ins', icon: 'collection' },
   { id: 'friends', label: 'Freunde', icon: 'friends' },
   { id: 'profile', label: 'Profil', icon: 'profile' },
 ];

@@ -1,9 +1,9 @@
-// B4: Ländergrenzen für Deutschland, die neun Nachbarländer und Italien als SQL erzeugen.
+// B4: Ländergrenzen für Deutschland, die neun Nachbarländer, Italien und Spanien als SQL erzeugen.
 // Quelle: Natural Earth, ne_10m_admin_0_countries.geojson (gemeinfrei).
 // Aufruf: node scripts/import-countries.mjs ne_10m_admin_0_countries.geojson > supabase/countries.sql
 import { readFileSync } from 'node:fs';
 
-const ALLOWED = ['DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL', 'IT'];
+const ALLOWED = ['DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL', 'IT', 'ES'];
 const file = process.argv[2];
 if (!file) {
   console.error('Aufruf: node scripts/import-countries.mjs ne_10m_admin_0_countries.geojson > supabase/countries.sql');

@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { readPubs } from './osm-lib.mjs';
 
-const ALLOWED = ['DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL', 'IT'];
+const ALLOWED = ['DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL', 'IT', 'ES'];
 const BATCH = 1000;
 const [cmd, file] = process.argv.slice(2);
 const url = (process.env.SUPABASE_URL ?? '').trim().replace(/\/+$/, '');

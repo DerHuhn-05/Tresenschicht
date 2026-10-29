@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -8,6 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="color-scheme" content="dark" />
     <meta name="apple-mobile-web-app-title" content="Tresenschicht" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml" />
@@ -24,6 +25,10 @@
     <link rel="apple-touch-startup-image" href="./icons/splash-1080x2340.png" media="(device-width: 360px) and (device-height: 780px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <link rel="apple-touch-startup-image" href="./icons/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
     <title>Tresenschicht</title>
+    <script>
+      // Die App ist immer Nachtblau. Nur wer am iPhone „Kontrast erhöhen“ eingestellt hat, bekommt den Hochkontrast-Modus.
+      if (matchMedia('(prefers-contrast: more)').matches) document.documentElement.dataset.theme = 'contrast';
+    </script>
     <!-- Ladebildschirm: steht sofort, bevor CSS und JavaScript geladen sind; React ersetzt ihn -->
     <style>
       html, body { margin: 0; height: 100%; background: #000035; }

@@ -22,7 +22,7 @@ zu einer Stelle mit mehreren Treffern.
    `schema.sql` enthalten).
 4. Ländergrenzen und Kneipen: GitHub → Actions → **Kneipen importieren** → Run workflow. Braucht die Secrets
    `VITE_SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`. Der Workflow lädt die Ländergrenzen (Natural Earth) und die
-   OSM-Auszüge von Geofabrik (Deutschland, die neun Nachbarländer und Italien), filtert Kneipen, Bars und Biergärten (ohne Clubs, ohne Geschlossenes) und schreibt sie in
+   OSM-Auszüge von Geofabrik (Deutschland, die neun Nachbarländer, Italien und Spanien), filtert Kneipen, Bars und Biergärten (ohne Clubs, ohne Geschlossenes) und schreibt sie in
    die Datenbank. Zum Testen nur `germany` eintragen. Er läuft danach am 1. jedes Monats von selbst.
 5. `.env.example` nach `.env` kopieren, `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` eintragen.
 6. Dein Konto zum Prüfer machen: `update profiles set is_admin = true where username = 'deinname';`

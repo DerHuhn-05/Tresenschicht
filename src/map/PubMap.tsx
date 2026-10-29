@@ -35,8 +35,27 @@ interface Props {
 // Farben für Pins und Sammel-Marker: auf der Nachtblau-Karte immer Bernstein mit Nachtblau (Design System, dunkel)
 const MARKER = tokenColor('marker', 'dark');
 const GLYPH = tokenColor('marker-glyph', 'dark');
-const DONE = tokenColor('sky-300', 'dark');
+const DONE = tokenColor('white', 'dark');
 const RATIO = Math.min(3, Math.max(2, Math.round(globalThis.devicePixelRatio || 2)));
+
+/** Zoomen mit 75 % der normalen Geschwindigkeit: wirkt ruhiger und flüssiger. */
+const ZOOM_SPEED = 0.75;
+
+/** Fingergeste und Mausrad langsamer machen. Die Fingergeste hat in MapLibre keine Einstellung dafür;
+ *  ihr Zoom-Schritt wird deshalb pro Bewegung mit ZOOM_SPEED multipliziert. Verschieben bleibt unverändert. */
+function slowDownZoom(m: MlMap) {
+  m.scrollZoom.setWheelZoomRate((1 / 450) * ZOOM_SPEED);
+  m.scrollZoom.setZoomRate((1 / 100) * ZOOM_SPEED);
+  const pinch = (m.touchZoomRotate as any)?._touchZoom;
+  if (pinch && typeof pinch._move === 'function') {
+    const move = pinch._move.bind(pinch);
+    pinch._move = (...args: unknown[]) => {
+      const r = move(...args);
+      if (r && typeof r.zoomDelta === 'number') r.zoomDelta *= ZOOM_SPEED;
+      return r;
+    };
+  }
+}
 
 const LAYERS = ['cells-cluster', 'cells-pin', 'pubs-cluster', 'pubs-pin', 'selected-pin'];
 const clusterSize = (n: number) => (n < 10 ? 44 : n < 100 ? 52 : 60); // cluster-s, -m, -l
@@ -127,7 +146,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
   const index = useRef(new Map<string, Pub>()); // alle bekannten Kneipen nach id
   const detailIds = useRef(new Set<string>()); // Kneipen aus Zoom-13-Kacheln
   const cache = useRef(new Map<string, PubTile | 'loading'>());
-  const cellsShown = useRef<FC>(EMPTY);
+  const tries = useRef(new Map<string, number>());
   const props = useRef({ pubs, loadTile, collected, selectedId, onSelect, userPos, onMapClick, onMove });
   props.current = { pubs, loadTile, collected, selectedId, onSelect, userPos, onMapClick, onMove };
 
@@ -164,7 +183,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     return map.current?.getSource(id) as GeoJSONSource | undefined;
   }
 
-  /** Daten in die Kartenquellen schreiben. Zählfelder wechseln erst, wenn alle Kacheln der Zoomstufe da sind. */
+  /** Daten in die Kartenquellen schreiben. Zählfelder erscheinen Kachel für Kachel, sobald sie geladen sind. */
   function push() {
     const m = map.current;
     if (!m || !m.getSource('pubs')) return;
@@ -179,12 +198,9 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       if (z < DETAIL_ZOOM) {
         const b = m.getBounds();
         const tiles = tilesFor({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, z, 1);
-        const parts = tiles.map(([tz, tx, ty]) => cache.current.get(`${tz}/${tx}/${ty}`));
-        if (parts.every((t) => t && t !== 'loading')) {
-          cellsShown.current = { type: 'FeatureCollection', features: (parts as PubTile[]).flatMap((t) => cellFeatures(t.cells ?? [])) };
-        }
+        const parts = tiles.map(([tz, tx, ty]) => cache.current.get(`${tz}/${tx}/${ty}`)).filter((t): t is PubTile => !!t && t !== 'loading');
+        source('cells')!.setData({ type: 'FeatureCollection', features: parts.flatMap((t) => cellFeatures(t.cells ?? [])) });
       }
-      source('cells')!.setData(cellsShown.current);
     }
     const sel = props.current.selectedId ? index.current.get(props.current.selectedId) : undefined;
     source('selected')!.setData(sel ? { type: 'FeatureCollection', features: [pubFeature(sel, isDone(sel.id))] } : EMPTY);
@@ -200,6 +216,10 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     const tiles = tilesFor({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, z, 1);
     if (tiles.length > 80) return;
     let pending = 0;
+    let frame = 0;
+    const redraw = () => {
+      if (!frame) frame = requestAnimationFrame(() => ((frame = 0), push()));
+    };
     for (const [tz, tx, ty] of tiles) {
       const key = `${tz}/${tx}/${ty}`;
       if (cache.current.has(key)) continue;
@@ -208,15 +228,22 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       load(tz, tx, ty)
         .then((t) => {
           cache.current.set(key, t);
+          tries.current.delete(key);
           for (const p of t.pubs ?? []) {
             index.current.set(p.id, p);
             detailIds.current.add(p.id);
           }
+          redraw();
         })
-        .catch(() => cache.current.delete(key))
+        .catch(() => {
+          // Fehlgeschlagene Kachel nach kurzer Pause erneut laden (höchstens dreimal)
+          cache.current.delete(key);
+          const n = (tries.current.get(key) ?? 0) + 1;
+          tries.current.set(key, n);
+          if (n <= 3) setTimeout(loadVisible, 1500 * n);
+        })
         .finally(() => {
           pending--;
-          if (pending === 0 || tz >= DETAIL_ZOOM) push();
         });
     }
     if (!pending) push();
@@ -269,6 +296,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       fadeDuration: 0,
     });
     m.touchZoomRotate.disableRotation();
+    slowDownZoom(m);
     map.current = m;
 
     const img = new Image();

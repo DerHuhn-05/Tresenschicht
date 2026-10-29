@@ -35,8 +35,8 @@ export function FriendsScreen() {
 
   return (
     <div className="screen">
-      <h1 className="t-h1">Freunde</h1>
-      <div className="input-icon" style={{ marginTop: 16 }}>
+      <h1 className="t-display page-title">Freunde</h1>
+      <div className="input-icon">
         <Icon name="search" />
         <input className="input" type="search" placeholder="Benutzername suchen" aria-label="Freunde nach Benutzername suchen" value={q} onChange={(e) => setQ(e.target.value)} autoCapitalize="none" autoCorrect="off" />
       </div>

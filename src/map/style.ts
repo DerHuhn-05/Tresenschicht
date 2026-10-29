@@ -8,21 +8,21 @@ const c = (n: string) => tokenColor(n, 'dark');
 
 /**
  * C6: Kartenskin in den Markenfarben, immer im Nachtblau der App (unabhängig vom Hell-/Dunkelmodus).
- * Verschiedene Blautöne trennen die Flächen: Wasser am dunkelsten, Land Nachtblau, Grün und Gebäude
- * eine Spur heller, Straßen in hellen Blautönen, Hauptstraßen mit Bernstein wie Straßenlaternen.
+ * Nur Nachtblau und die bläulichen Grautöne des Design Systems: Wasser am dunkelsten, Land Nachtblau,
+ * Grünflächen und Gebäude eine Spur heller, Straßen in Grau. Bernstein bleibt den Kneipen-Pins vorbehalten.
  * Keine Verläufe, keine Schatten, kaum Beschriftung. Schema: OpenMapTiles.
  */
 export const MAP_COLORS = {
   land: c('navy-900'), // #000035
   water: c('navy-950'), // #00001F
-  green: '#05093F',
-  building: c('navy-800'), // #0D0F4A
+  green: c('navy-800'), // #0D0F4A
+  building: c('gray-900'), // #1B1C2A
   minor: c('navy-700'), // #1F2260
-  major: c('navy-600'), // #363A7A
-  motorway: c('amber-500'),
-  label: c('navy-300'), // #A9ACD4
+  major: c('gray-700'), // #454658
+  motorway: c('gray-600'), // #5E5F73
+  label: c('gray-400'), // #9899AB
   halo: c('navy-900'),
-  border: c('navy-400'),
+  border: c('gray-500'),
 };
 
 export function brandStyle(): StyleSpecification {
@@ -58,7 +58,7 @@ export function brandStyle(): StyleSpecification {
         id: 'road-motorway', type: 'line', source: 'omt', 'source-layer': 'transportation',
         filter: cls('motorway'),
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': m.motorway, 'line-opacity': 0.45, 'line-width': width(1.1) },
+        paint: { 'line-color': m.motorway, 'line-width': width(1.2) },
       },
       {
         id: 'border', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['==', ['get', 'admin_level'], 2],

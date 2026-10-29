@@ -4,8 +4,8 @@ export const OPERATOR = {
   street: 'Johannesstraße 3',
   city: '85049 Ingolstadt',
   country: 'Deutschland',
-  /** Pflichtangabe im Impressum (§ 5 DDG). Leer lassen, bis die Adresse feststeht. */
-  email: '',
+  /** Pflichtangabe im Impressum (§ 5 DDG), zugleich Adresse für Hilfe und Kontakt */
+  email: 'tresenschicht@gmx.net',
 };
 
 export const PRIVACY_DATE = '30. Oktober 2026';

@@ -118,6 +118,7 @@ export function ProfileScreen() {
           <Row icon="lock" title="Privatsphäre und Datenschutz" sub="Dein Profil ist privat" onClick={() => app.push({ kind: 'privacy' })} />
           <Row icon="close" title="Gesperrte Nutzer" onClick={() => app.push({ kind: 'blocked' })} />
           {u.isAdmin && <Row icon="flag" title="Prüfliste" sub="Neue Kneipen und Änderungen" onClick={() => app.push({ kind: 'review' })} />}
+          <Row icon="mail" title="Hilfe und Kontakt" sub="Fragen, Probleme, Feedback" onClick={() => app.push({ kind: 'help' })} />
           <Row icon="info" title="Datenschutzerklärung" onClick={() => app.push({ kind: 'datenschutz' })} />
           <Row icon="info" title="Impressum" onClick={() => app.push({ kind: 'impressum' })} />
           <Row icon="logout" title="Abmelden" onClick={() => setAsk('logout')} />

@@ -20,7 +20,8 @@ export type Route =
   | { kind: 'impressum' }
   | { kind: 'blocked' }
   | { kind: 'datenschutz' }
-  | { kind: 'locationHelp' };
+  | { kind: 'locationHelp' }
+  | { kind: 'help' };
 
 export type LocStatus = 'off' | 'asking' | 'ok' | 'denied' | 'unavailable';
 

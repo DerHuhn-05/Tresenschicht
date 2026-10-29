@@ -10,6 +10,7 @@ import { MapScreen } from './screens/MapScreen';
 import { BlockedUsers, EditProfile, LocationHelp, PrivacyScreen, ProfileScreen } from './screens/ProfileScreens';
 import { AddPub, PubDetail, ReviewQueue, SearchScreen } from './screens/PubScreens';
 import { Datenschutz, Impressum } from './screens/LegalScreens';
+import { HelpScreen } from './screens/HelpScreen';
 import { load } from './lib/storage';
 import { LOCATION_ASKED, useApp, type Route, type Tab } from './state/app';
 
@@ -36,6 +37,7 @@ function RouteView({ r }: { r: Route }) {
     case 'blocked': return <BlockedUsers />;
     case 'datenschutz': return <Datenschutz onBack={app.pop} />;
     case 'locationHelp': return <LocationHelp />;
+    case 'help': return <HelpScreen />;
   }
 }
 

@@ -1203,3 +1203,27 @@ textarea.input {
     animation: spin 1600ms linear infinite !important;
   }
 }
+
+/* Hilfe: häufige Fragen zum Aufklappen */
+.faq { display: grid; gap: var(--space-2); }
+.faq details {
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: var(--stroke-hairline) solid var(--border-subtle);
+}
+.faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary svg { flex: none; transition: transform 0.2s; }
+.faq details[open] summary svg { transform: rotate(180deg); }
+.faq details p { padding: 0 var(--space-4) var(--space-4); }
+.btn.is-disabled { opacity: 0.45; pointer-events: none; }

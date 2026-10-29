@@ -3,7 +3,7 @@ import { api, type Bounds, type Pub } from '../api';
 import { DEMO_MULTI, DEMO_START } from '../api/demoData';
 import { Icon } from '../components/Icon';
 import { Notice, Sheet } from '../components/ui';
-import { PubMap, type PubMapHandle } from '../map/PubMap';
+import { PubMap, type PubMapHandle } from '../map/LazyMap';
 import { countdown, formatDistance, PUB_TYPE_LABEL } from '../lib/format';
 import { distanceM } from '../lib/geo';
 import { isDemo, useApp, useNow } from '../state/app';

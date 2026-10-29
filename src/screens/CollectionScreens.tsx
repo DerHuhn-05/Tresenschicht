@@ -3,7 +3,7 @@ import { api, type CheckIn, type CollectionEntry } from '../api';
 import { Icon, type IconName } from '../components/Icon';
 import { Confirm, Empty, Field, Page, PhotoPicker, Spinner } from '../components/ui';
 import { formatDate, plural, relativeTime } from '../lib/format';
-import { PubMap, type PubMapHandle } from '../map/PubMap';
+import { PubMap, type PubMapHandle } from '../map/LazyMap';
 import { useApp } from '../state/app';
 import { typeIcon } from './PubScreens';
 

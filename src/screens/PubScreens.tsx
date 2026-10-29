@@ -5,7 +5,7 @@ import { Confirm, Field, Notice, Page, PhotoPicker, Spinner } from '../component
 import { formatDate, formatDistance, PUB_TYPE_LABEL, relativeTime } from '../lib/format';
 import { distanceM, type LatLon } from '../lib/geo';
 import { RADIUS_M } from '../lib/rules';
-import { PubMap } from '../map/PubMap';
+import { PubMap } from '../map/LazyMap';
 import markerLight from '../assets/pub-marker.svg';
 import { useApp } from '../state/app';
 

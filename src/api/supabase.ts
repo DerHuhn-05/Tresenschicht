@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { LatLon } from '../lib/geo';
 import type {
-  Api, Bounds, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, SignUpData, User,
+  Api, Bounds, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, SignUpData, User,
 } from './types';
 
 // Echtes Backend (supabase/schema.sql). Alle Regeln prüft der Server; die App zeigt nur an.
@@ -163,8 +163,12 @@ export class SupabaseApi implements Api {
   }
 
   async updateProfile(patch: Parameters<Api['updateProfile']>[0]) {
-    const { avatar, firstName, lastName, city } = patch;
+    const { avatar, firstName, lastName, city, username } = patch;
     const row: Row = {};
+    if (username !== undefined && username.toLowerCase() !== this.me?.username.toLowerCase()) {
+      if (!(await this.isUsernameFree(username))) throw new Error('Dieser Benutzername ist schon vergeben.');
+      row.username = username;
+    } else if (username !== undefined) row.username = username; // nur Groß-/Kleinschreibung geändert
     if (firstName !== undefined) row.first_name = firstName;
     if (lastName !== undefined) row.last_name = lastName;
     if (city !== undefined) row.city = city;
@@ -232,6 +236,8 @@ export class SupabaseApi implements Api {
         p_checkin: !!checkIn, p_pos_lat: checkIn?.pos.lat ?? null, p_pos_lon: checkIn?.pos.lon ?? null, p_accuracy: checkIn?.accuracy ?? null,
       })
     ) as Row;
+    const edit = (await this.sb.from('pub_edits').select('id').eq('pub_id', r.pubId).eq('user_id', this.uid()).maybeSingle()).data as Row | null;
+    if (edit) this.mailReview(edit.id);
     const ci = r.checkin as Row | null;
     if (!ci) return null;
     if (!ci.ok) return { ok: false, reason: ci.reason, retryAt: ci.retryAt };
@@ -240,11 +246,41 @@ export class SupabaseApi implements Api {
   }
 
   async proposeEdit(pubId: string, patch: Partial<Pick<Pub, 'name' | 'openingHours'>>) {
-    must(await this.sb.from('pub_edits').insert({ user_id: this.uid(), pub_id: pubId, kind: 'aenderung', vorschlag: patch }));
+    const r = must(await this.sb.from('pub_edits').insert({ user_id: this.uid(), pub_id: pubId, kind: 'aenderung', vorschlag: patch }).select('id').single()) as Row;
+    this.mailReview(r.id);
   }
 
   async reportClosed(pubId: string) {
-    must(await this.sb.from('pub_edits').insert({ user_id: this.uid(), pub_id: pubId, kind: 'geschlossen', vorschlag: { status: 'geschlossen' } }));
+    const r = must(await this.sb.from('pub_edits').insert({ user_id: this.uid(), pub_id: pubId, kind: 'geschlossen', vorschlag: { status: 'geschlossen' } }).select('id').single()) as Row;
+    this.mailReview(r.id);
+  }
+
+  /** Hinweis-Mail an die Prüfadresse. Läuft im Hintergrund: scheitert sie, bleibt der Vorschlag trotzdem in der Prüfliste. */
+  private mailReview(editId: string) {
+    this.sb.functions.invoke('pub-review', { body: { action: 'notify', editId } }).catch(() => {});
+  }
+
+  private async reviewCall<T>(body: Record<string, unknown>): Promise<T> {
+    const { data, error } = await this.sb.functions.invoke('pub-review', { body });
+    if (error) {
+      const msg = await (error as { context?: Response }).context?.json?.().then((j: Row) => j.error).catch(() => null);
+      throw new Error(msg || 'Die Prüfung ist gerade nicht erreichbar.');
+    }
+    return data as T;
+  }
+
+  async reviewByLink(id: string, token: string): Promise<ReviewLinkEdit> {
+    return (await this.reviewCall<{ edit: ReviewLinkEdit }>({ action: 'get', editId: id, token })).edit;
+  }
+
+  async decideByLink(id: string, token: string, accept: boolean) {
+    await this.reviewCall({ action: 'decide', editId: id, token, accept });
+  }
+
+  async reviewNews(): Promise<ReviewNews[]> {
+    const list = must(await this.sb.rpc('my_review_news')) as ReviewNews[];
+    if (list.length) await this.sb.rpc('mark_review_news_seen', { p_ids: list.map((n) => n.id) });
+    return list;
   }
 
   async reviewQueue(): Promise<PubEdit[]> {

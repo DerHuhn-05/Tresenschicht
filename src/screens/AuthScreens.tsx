@@ -64,7 +64,7 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
   );
 }
 
-const USERNAME = /^[A-Za-z0-9._]{3,24}$/;
+export const USERNAME = /^[A-Za-z0-9._]{3,24}$/;
 
 function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (u: User, isNew: boolean) => void; onConfirm: (email: string) => void }) {
   const [privacy, setPrivacy] = useState(false);

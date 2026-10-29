@@ -5,7 +5,7 @@ import { load, save } from '../lib/storage';
 import { CELLS_PER_TILE, DETAIL_ZOOM, latToTileY, lonToTileX } from '../lib/tiles';
 import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
 import type {
-  Api, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, User,
+  Api, CountryTotal, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, ReviewLinkEdit, ReviewNews, User,
 } from './types';
 
 // Demo-Backend: dieselben Regeln wie der Server, Daten nur im Browser (localStorage).
@@ -34,6 +34,7 @@ interface DbEdit {
   userId: string;
   at: string;
   status: PubEdit['status'];
+  seen?: boolean;
 }
 interface Db {
   v: 1;
@@ -217,6 +218,9 @@ export class DemoApi implements Api {
   async updateProfile(patch: Parameters<Api['updateProfile']>[0]) {
     const me = this.me();
     const { avatar, ...rest } = patch;
+    if (rest.username && rest.username.toLowerCase() !== me.username.toLowerCase() && !(await this.isUsernameFree(rest.username))) {
+      throw new Error('Dieser Benutzername ist schon vergeben.');
+    }
     Object.assign(me, rest);
     if (avatar) me.avatarUrl = await blobToDataUrl(avatar);
     this.commit();
@@ -378,6 +382,22 @@ export class DemoApi implements Api {
       }
     }
     this.commit();
+  }
+
+  async reviewNews(): Promise<ReviewNews[]> {
+    const me = this.me().id;
+    const list = this.db.edits.filter((e) => e.userId === me && e.status !== 'offen' && !e.seen);
+    list.forEach((e) => (e.seen = true));
+    if (list.length) this.commit();
+    return this.wait(list.map((e) => ({ id: e.id, kind: e.kind, accepted: e.status === 'angenommen', name: e.proposal.name ?? (e.pubId ? this.pub(e.pubId)?.name : '') ?? '' })));
+  }
+
+  async reviewByLink(): Promise<ReviewLinkEdit> {
+    throw new Error('Die Prüfung per E-Mail gibt es nur mit dem echten Server.');
+  }
+
+  async decideByLink() {
+    throw new Error('Die Prüfung per E-Mail gibt es nur mit dem echten Server.');
   }
 
   // Check-in: dieselben Prüfungen wie die Funktion check_in() auf dem Server

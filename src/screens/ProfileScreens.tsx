@@ -7,6 +7,7 @@ import { isDemo, useApp } from '../state/app';
 import { BadgeGrid } from '../components/Badges';
 import { badgesOf } from '../lib/badges';
 import { StatsPanel, StatTile } from '../components/Stats';
+import { USERNAME } from './AuthScreens';
 import { VisitCard } from './CollectionScreens';
 
 function Row({ icon, title, sub, onClick, danger }: { icon: IconName; title: string; sub?: string; onClick: () => void; danger?: boolean }) {
@@ -183,8 +184,19 @@ export function EditProfile() {
   const [firstName, setFirst] = useState(u.firstName);
   const [lastName, setLast] = useState(u.lastName);
   const [city, setCity] = useState(u.city);
+  const [username, setUsername] = useState(u.username);
+  const [free, setFree] = useState<boolean | null>(null);
   const [avatar, setAvatar] = useState<{ blob: Blob; url: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const name = username.trim().replace(/^@/, '');
+  const changed = name.toLowerCase() !== u.username.toLowerCase();
+  useEffect(() => {
+    setFree(null);
+    if (!changed || !USERNAME.test(name)) return;
+    const t = setTimeout(() => api.isUsernameFree(name).then(setFree).catch(() => setFree(null)), 300);
+    return () => clearTimeout(t);
+  }, [name, changed]);
+  const nameError = !USERNAME.test(name) ? '3 bis 24 Zeichen: Buchstaben, Ziffern, Punkt und Unterstrich.' : changed && free === false ? 'Dieser Benutzername ist schon vergeben.' : null;
   return (
     <Page onBack={app.pop} title="Profil bearbeiten">
       <form
@@ -192,7 +204,8 @@ export function EditProfile() {
           e.preventDefault();
           setSaving(true);
           try {
-            app.setUser(await api.updateProfile({ firstName: firstName.trim(), lastName: lastName.trim(), city: city.trim(), avatar: avatar?.blob }));
+            if (nameError) return;
+            app.setUser(await api.updateProfile({ firstName: firstName.trim(), lastName: lastName.trim(), city: city.trim(), username: name, avatar: avatar?.blob }));
             app.notify('Gespeichert.', 'success');
             app.pop();
           } catch (err) {
@@ -210,10 +223,10 @@ export function EditProfile() {
         <Field label="Vorname">{(id) => <input id={id} className="input" value={firstName} onChange={(e) => setFirst(e.target.value)} required autoComplete="given-name" />}</Field>
         <Field label="Nachname">{(id) => <input id={id} className="input" value={lastName} onChange={(e) => setLast(e.target.value)} required autoComplete="family-name" />}</Field>
         <Field label="Stadt">{(id) => <input id={id} className="input" value={city} onChange={(e) => setCity(e.target.value)} required autoComplete="address-level2" />}</Field>
-        <Field label="Benutzername" hint="Der Benutzername lässt sich nicht ändern.">
-          {(id, d) => <input id={id} aria-describedby={d} className="input" value={`@${u.username}`} readOnly />}
+        <Field label="Benutzername" hint="Unter diesem Namen finden dich Freunde." error={nameError} ok={changed && free ? 'Frei.' : null}>
+          {(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!nameError} className="input" value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" autoCorrect="off" autoComplete="username" />}
         </Field>
-        <button className="btn btn-primary btn-block" style={{ marginTop: 32 }} disabled={saving}>{saving ? 'Wird gespeichert …' : 'Speichern'}</button>
+        <button className="btn btn-primary btn-block" style={{ marginTop: 32 }} disabled={saving || !!nameError || (changed && free !== true)}>{saving ? 'Wird gespeichert …' : 'Speichern'}</button>
       </form>
     </Page>
   );

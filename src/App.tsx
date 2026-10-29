@@ -52,6 +52,22 @@ export function App() {
     api.friendRequests().then((r) => setRequests(r.length)).catch(() => {});
   }, [app.user, app.version]);
 
+  // Rückmeldung zu eigenen Vorschlägen, sobald sie geprüft sind
+  useEffect(() => {
+    if (!app.user) return;
+    api.reviewNews().then((news) => {
+      if (!news.length) return;
+      const ok = news.filter((n) => n.accepted);
+      const no = news.filter((n) => !n.accepted);
+      const parts = [];
+      if (ok.length) parts.push(ok.length === 1 ? (ok[0].kind === 'neu' ? `„${ok[0].name}“ ist geprüft und jetzt für alle auf der Karte.` : `Dein Vorschlag zu „${ok[0].name}“ wurde übernommen.`) : `${ok.length} deiner Vorschläge wurden übernommen.`);
+      if (no.length) parts.push(no.length === 1 ? `Deinen Vorschlag „${no[0].name}“ haben wir nicht übernommen.` : `${no.length} Vorschläge haben wir nicht übernommen.`);
+      app.notify(ok.length ? `${parts.join(' ')} Danke!` : parts.join(' '), ok.length ? 'success' : 'info');
+      if (ok.length) app.bump();
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.user?.id]);
+
   let body;
   if (!app.user) {
     body = (

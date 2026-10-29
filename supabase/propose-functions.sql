@@ -69,7 +69,8 @@ language plpgsql security definer set search_path = public as $$
 declare
   e pub_edits;
 begin
-  if not is_admin() then raise exception 'Nur für die Prüfung freigeschaltete Konten.'; end if;
+  -- Admin in der App oder die Freigabe per E-Mail-Link (Edge Function mit Service-Schlüssel)
+  if not (is_admin() or coalesce(auth.role(), '') = 'service_role') then raise exception 'Nur für die Prüfung freigeschaltete Konten.'; end if;
   select * into e from pub_edits where id = p_id and status = 'offen' for update;
   if not found then return; end if;
   update pub_edits set status = case when p_accept then 'angenommen' else 'abgelehnt' end, reviewed_by = auth.uid() where id = p_id;

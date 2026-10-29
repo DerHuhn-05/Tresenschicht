@@ -118,6 +118,28 @@ export interface NewPubProposal {
   checkIn?: { pos: LatLon; accuracy: number };
 }
 
+/** Rückmeldung zu einem eigenen Vorschlag, der inzwischen geprüft wurde */
+export interface ReviewNews {
+  id: string;
+  kind: PubEdit['kind'];
+  name: string;
+  accepted: boolean;
+}
+
+/** Vorschlag auf der Prüfseite aus der E-Mail */
+export interface ReviewLinkEdit {
+  id: string;
+  kind: PubEdit['kind'];
+  status: PubEdit['status'];
+  name: string;
+  username: string;
+  at: string;
+  lat?: number;
+  lon?: number;
+  photoUrl?: string | null;
+  rows: [string, string][];
+}
+
 export interface PubEdit {
   id: string;
   kind: 'neu' | 'aenderung' | 'geschlossen';
@@ -189,7 +211,7 @@ export interface Api {
   resetPasswordWithCode(email: string, code: string, password: string): Promise<User>;
   deleteAccount(): Promise<void>;
   isUsernameFree(username: string): Promise<boolean>;
-  updateProfile(patch: Partial<Pick<User, 'firstName' | 'lastName' | 'city'>> & { avatar?: Blob }): Promise<User>;
+  updateProfile(patch: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'username'>> & { avatar?: Blob }): Promise<User>;
 
   // Kneipen (B, D)
   pubsInBounds(b: Bounds): Promise<Pub[]>;
@@ -206,6 +228,11 @@ export interface Api {
   proposeEdit(pubId: string, patch: Partial<Pick<Pub, 'name' | 'openingHours'>>): Promise<void>;
   reportClosed(pubId: string): Promise<void>;
   reviewQueue(): Promise<PubEdit[]>;
+  /** Geprüfte eigene Vorschläge, die noch nicht gemeldet wurden; danach als gesehen markiert */
+  reviewNews(): Promise<ReviewNews[]>;
+  /** Prüfseite aus der E-Mail (ohne Login, der Link enthält eine Signatur) */
+  reviewByLink(id: string, token: string): Promise<ReviewLinkEdit>;
+  decideByLink(id: string, token: string, accept: boolean): Promise<void>;
   review(id: string, accept: boolean): Promise<void>;
 
   // Check-in (C)

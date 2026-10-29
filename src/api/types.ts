@@ -114,6 +114,8 @@ export interface NewPubProposal {
   address: string;
   city: string;
   photo?: Blob;
+  /** Vor Ort: gleich einchecken (gleiche Regeln wie beim normalen Check-in) */
+  checkIn?: { pos: LatLon; accuracy: number };
 }
 
 export interface PubEdit {
@@ -199,7 +201,8 @@ export interface Api {
   bookmarks(): Promise<Pub[]>;
   setBookmark(pubId: string, on: boolean): Promise<void>;
   getPub(id: string): Promise<Pub | null>;
-  proposePub(p: NewPubProposal): Promise<void>;
+  /** Legt die Kneipe zur Prüfung an. Mit `checkIn` zählt sie sofort als Besuch; Ergebnis des Check-ins oder null. */
+  proposePub(p: NewPubProposal): Promise<CheckInResult | null>;
   proposeEdit(pubId: string, patch: Partial<Pick<Pub, 'name' | 'openingHours'>>): Promise<void>;
   reportClosed(pubId: string): Promise<void>;
   reviewQueue(): Promise<PubEdit[]>;

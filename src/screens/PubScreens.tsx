@@ -4,7 +4,7 @@ import { Icon, type IconName } from '../components/Icon';
 import { Confirm, Field, Notice, Page, PhotoPicker, Spinner } from '../components/ui';
 import { formatDate, formatDistance, PUB_TYPE_LABEL, relativeTime } from '../lib/format';
 import { distanceM, type LatLon } from '../lib/geo';
-import { RADIUS_M } from '../lib/rules';
+import { MAX_ACCURACY_M, RADIUS_M, REFUSAL_TEXT } from '../lib/rules';
 import { PubMap } from '../map/LazyMap';
 import markerLight from '../assets/pub-marker.svg';
 import { useApp } from '../state/app';
@@ -63,6 +63,11 @@ export function PubDetail({ id }: { id: string }) {
       {pub.status === 'geschlossen' && (
         <div style={{ marginTop: 16 }}>
           <Notice icon="warning">Diese Kneipe ist als geschlossen gemeldet.</Notice>
+        </div>
+      )}
+      {pub.status === 'zu_pruefen' && (
+        <div style={{ marginTop: 16 }}>
+          <Notice icon="clock">Neu eingetragen: Wir prüfen die Kneipe noch. Danach sehen sie alle auf der Karte.</Notice>
         </div>
       )}
 
@@ -275,6 +280,12 @@ export function AddPub({ pos }: { pos?: LatLon }) {
   const [similar, setSimilar] = useState<Pub[] | null>(null);
   const [sending, setSending] = useState(false);
 
+  // Vor Ort? Dann zählt das Eintragen gleich als Check-in (gleiche Regeln wie beim normalen Check-in)
+  const { pos: me, accuracy } = app.location;
+  const onSite = !!(me && where && accuracy != null && accuracy <= MAX_ACCURACY_M && distanceM(me, where) <= RADIUS_M + Math.min(accuracy, 50));
+  const [withCheckIn, setWithCheckIn] = useState(true);
+  const checkInNow = onSite && withCheckIn && !app.lockedUntil;
+
   async function submit(force = false) {
     if (!where) return;
     if (!force) {
@@ -286,8 +297,19 @@ export function AddPub({ pos }: { pos?: LatLon }) {
     }
     setSending(true);
     try {
-      await api.proposePub({ name: name.trim(), type, lat: where.lat, lon: where.lon, address: address.trim(), city: city.trim(), photo: photo?.blob });
-      app.notify('Danke. Wir prüfen die Kneipe, dann erscheint sie auf der Karte.', 'success');
+      const r = await api.proposePub({
+        name: name.trim(), type, lat: where.lat, lon: where.lon, address: address.trim(), city: city.trim(), photo: photo?.blob,
+        checkIn: checkInNow && me ? { pos: me, accuracy: accuracy! } : undefined,
+      });
+      if (r?.ok) {
+        app.setLastCheckIn(r.checkin);
+        app.bump();
+        app.notify(`Eingetragen und eingecheckt: ${name.trim()} zählt schon in deiner Sammlung. Für alle erscheint sie nach unserer Prüfung.`, 'success');
+      } else if (r) {
+        app.notify(`Eingetragen, aber nicht eingecheckt. ${REFUSAL_TEXT[r.reason]}`, 'info');
+      } else {
+        app.notify('Danke. Wir prüfen die Kneipe, dann erscheint sie auf der Karte.', 'success');
+      }
       app.pop();
     } catch (e) {
       app.notify((e as Error).message, 'error');
@@ -330,7 +352,7 @@ export function AddPub({ pos }: { pos?: LatLon }) {
           submit();
         }}
       >
-        <p className="muted" style={{ marginBottom: 20 }}>Neue Kneipen prüfen wir, bevor sie auf der Karte erscheinen.</p>
+        <p className="muted" style={{ marginBottom: 20 }}>Neue Kneipen prüfen wir, bevor sie für alle auf der Karte erscheinen.</p>
         <Field label="Name">{(id) => <input id={id} className="input" value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} autoComplete="off" />}</Field>
         <div className="field">
           <span className="field-label">Art</span>
@@ -359,8 +381,24 @@ export function AddPub({ pos }: { pos?: LatLon }) {
           <span className="field-label">Foto von außen (optional)</span>
           <PhotoPicker value={photo?.url} onChange={(blob, url) => setPhoto(blob && url ? { blob, url } : null)} />
         </div>
-        <button className="btn btn-primary btn-block" style={{ marginTop: 32 }} disabled={!name.trim() || !city.trim() || !where || sending}>
-          {sending ? 'Wird gesendet …' : 'Zur Prüfung senden'}
+        <div className="field" style={{ marginTop: 24 }}>
+          {onSite ? (
+            <label className="check-row">
+              <input type="checkbox" checked={withCheckIn} onChange={(e) => setWithCheckIn(e.target.checked)} disabled={!!app.lockedUntil} />
+              <span>
+                <strong>Ich bin gerade hier: gleich einchecken</strong>
+                <span className="t-secondary muted" style={{ display: 'block' }}>
+                  {app.lockedUntil ? 'Du hast gerade erst eingecheckt. Die Kneipe wird nur eingetragen.' : 'Die Kneipe zählt sofort als Check-in in deiner Sammlung.'}
+                </span>
+              </span>
+            </label>
+          ) : (
+            <Notice icon="location">Einchecken geht nur vor Ort. Bist du in der Kneipe, wird das Eintragen gleich zum Check-in.</Notice>
+          )}
+        </div>
+        <button className="btn btn-primary btn-block" style={{ marginTop: 16 }} disabled={!name.trim() || !city.trim() || !where || sending}>
+          {checkInNow && <Icon name="checkin" size={20} />}
+          {sending ? 'Wird gesendet …' : checkInNow ? 'Eintragen und einchecken' : 'Zur Prüfung senden'}
         </button>
       </form>
     </Page>

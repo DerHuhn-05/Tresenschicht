@@ -313,14 +313,19 @@ export class DemoApi implements Api {
     return this.wait(this.db.pubs.find((p) => p.id === id) ?? null, 0);
   }
 
-  async proposePub(p: Parameters<Api['proposePub']>[0]) {
-    const { photo, ...rest } = p;
+  async proposePub(p: Parameters<Api['proposePub']>[0]): Promise<CheckInResult | null> {
+    const { photo, checkIn, ...rest } = p;
+    if (!inWorkArea(p)) throw new Error('Kneipen gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien.');
+    // wie auf dem Server: sofort angelegt, aber erst nach der Prüfung für alle sichtbar
+    const pub: Pub = { id: uid(), name: p.name, type: p.type, lat: p.lat, lon: p.lon, address: p.address, city: p.city, country: 'DE', status: 'zu_pruefen', source: 'nutzer' };
+    this.db.pubs.push(pub);
     this.db.edits.push({
-      id: uid(), kind: 'neu', userId: this.me().id, at: new Date().toISOString(), status: 'offen',
+      id: uid(), kind: 'neu', pubId: pub.id, userId: this.me().id, at: new Date().toISOString(), status: 'offen',
       proposal: { ...rest, photoUrl: photo ? await blobToDataUrl(photo) : undefined },
     });
     this.commit();
-    await this.wait(null);
+    if (!checkIn) return this.wait(null);
+    return this.checkIn(pub.id, checkIn.pos, checkIn.accuracy);
   }
 
   async proposeEdit(pubId: string, patch: Partial<Pick<Pub, 'name' | 'openingHours'>>) {
@@ -351,7 +356,16 @@ export class DemoApi implements Api {
     const e = this.db.edits.find((x) => x.id === id);
     if (!e) return;
     e.status = accept ? 'angenommen' : 'abgelehnt';
-    if (accept) {
+    if (e.kind === 'neu' && e.pubId) {
+      // schon angelegt: freischalten oder samt Check-ins entfernen
+      if (accept) this.pub(e.pubId).status = 'aktiv';
+      else {
+        const id = e.pubId;
+        this.db.pubs = this.db.pubs.filter((x) => x.id !== id);
+        this.db.checkins = this.db.checkins.filter((c) => c.pubId !== id);
+        e.pubId = undefined;
+      }
+    } else if (accept) {
       if (e.kind === 'neu') {
         const p = e.proposal;
         this.db.pubs.push({

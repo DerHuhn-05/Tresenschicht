@@ -66,7 +66,7 @@ const clusterLabel = (n: number) =>
   n < 1000 ? String(n) : n < 10000 ? `${(Math.floor(n / 100) / 10).toLocaleString('de-DE')}k` : `${Math.round(n / 1000)}k`;
 /** Abstand in Pixeln, ab dem Kreise verschmelzen. Weit draußen großzügig (ein Land bleibt ein, zwei Kreise
  *  statt Nord und Süd), nah dran knapp (Kreise verschmelzen erst, wenn sie sich überlappen). */
-const mergeRadius = (z: number) => (z <= 6 ? 150 : z === 7 ? 120 : z === 8 ? 90 : z === 9 ? 66 : z === 10 ? 52 : 44);
+const mergeRadius = (z: number) => (z <= 5 ? 120 : z === 6 ? 110 : z === 7 ? 100 : z === 8 ? 84 : z === 9 ? 66 : z === 10 ? 52 : 44);
 
 /** Sammel-Marker als Bild mit Zahl: Bernstein-Kreis, Nachtblau-Ring und -Zahl. Braucht keine Kartenschrift.
  *  Bild-Name: cl-<Größe>-<Zahl>, z. B. cl-68-28k. */

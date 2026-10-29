@@ -1,7 +1,7 @@
 // Web-Mercator-Kacheln (wie bei Kartenkacheln): z/x/y. Die Karte lädt Kneipen kachelweise und merkt sie sich.
 export const DETAIL_ZOOM = 13; // Kacheln ab hier mit einzelnen Kneipen, darunter Zählfelder vom Server
 export const PIN_ZOOM = 12; // ab hier zeigt die Karte alle Kneipen einzeln (Stadtansicht), auch überlappend
-export const COUNTRY_ZOOM = 6; // darunter ein Kreis je Land
+export const COUNTRY_ZOOM = 5; // darunter ein Kreis je Land
 export const CELLS_PER_TILE = 16; // feine Zählfelder (etwa 16 px), die App fasst sie nach Abstand zusammen
 
 export function lonToTileX(lon: number, z: number): number {

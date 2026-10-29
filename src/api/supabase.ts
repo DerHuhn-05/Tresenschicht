@@ -219,14 +219,24 @@ export class SupabaseApi implements Api {
     return r ? toPub(r) : null;
   }
 
-  async proposePub(p: Parameters<Api['proposePub']>[0]) {
-    const { photo, ...vorschlag } = p;
-    let photoPath: string | undefined;
+  async proposePub(p: Parameters<Api['proposePub']>[0]): Promise<CheckInResult | null> {
+    const { photo, checkIn } = p;
+    let photoPath: string | null = null;
     if (photo) {
       photoPath = `${this.uid()}/pub-${Date.now()}.jpg`;
       must(await this.sb.storage.from('photos').upload(photoPath, photo, { contentType: 'image/jpeg' }));
     }
-    must(await this.sb.from('pub_edits').insert({ user_id: this.uid(), kind: 'neu', vorschlag: { ...vorschlag, photoPath } }));
+    const r = must(
+      await this.sb.rpc('propose_pub', {
+        p_name: p.name, p_type: p.type, p_lat: p.lat, p_lon: p.lon, p_address: p.address, p_city: p.city, p_photo_path: photoPath,
+        p_checkin: !!checkIn, p_pos_lat: checkIn?.pos.lat ?? null, p_pos_lon: checkIn?.pos.lon ?? null, p_accuracy: checkIn?.accuracy ?? null,
+      })
+    ) as Row;
+    const ci = r.checkin as Row | null;
+    if (!ci) return null;
+    if (!ci.ok) return { ok: false, reason: ci.reason, retryAt: ci.retryAt };
+    const pub = (await this.getPub(r.pubId))!;
+    return { ok: true, lockedUntil: ci.lockedUntil, checkin: { id: ci.id, userId: this.uid(), pub, at: ci.at, accuracy: Math.round(checkIn!.accuracy) } };
   }
 
   async proposeEdit(pubId: string, patch: Partial<Pick<Pub, 'name' | 'openingHours'>>) {

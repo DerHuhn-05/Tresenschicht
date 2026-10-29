@@ -51,7 +51,7 @@ export function CollectionView({ entries, userId, own }: { entries: CollectionEn
                 <div className="grow">
                   <div className="title">{e.pub.name}</div>
                   <div className="sub">
-                    {e.pub.city} · {plural(e.visits, 'Check-in', 'Check-ins')} · {relativeTime(e.lastAt)}
+                    {e.pub.city} · {plural(e.visits, 'Check-in', 'Check-ins')} · {relativeTime(e.lastAt)}{e.pub.status === 'zu_pruefen' ? ' · wird geprüft' : ''}
                   </div>
                 </div>
                 <span className="chev"><Icon name="chevron-right" /></span>

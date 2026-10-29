@@ -145,7 +145,7 @@ export function PhotoPicker({
     setBusy(true);
     setError(null);
     try {
-      const blob = await shrinkPhoto(file, round ? 600 : undefined);
+      const blob = await shrinkPhoto(file, round ? 'avatar' : 'photo');
       onChange(blob, URL.createObjectURL(blob));
     } catch {
       setError(t('Dieses Foto lässt sich nicht öffnen. Wähle ein anderes.'));

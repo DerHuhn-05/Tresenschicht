@@ -10,8 +10,10 @@ export const MAX_ACCURACY_M = 100; // schlechtere Genauigkeit: kein Check-in
 export const DECLINE_MINUTES = 30; // nach „Nein“ nicht erneut fragen
 export const LEAVE_DISTANCE_M = 100; // „Kneipe verlassen“ ab dieser Entfernung
 export const MIN_AGE = 18; // A5
-export const PHOTO_MAX_SIDE = 1600; // G3
-export const PHOTO_TARGET_BYTES = 300_000;
+export const PHOTO_MAX_SIDE = 1280; // G3: längste Seite; reicht für volle iPhone-Breite in Retina-Schärfe
+export const PHOTO_TARGET_BYTES = 140_000; // Ziel je Foto (vorher 300 KB): etwa doppelt so viele Fotos im Speicher
+export const AVATAR_MAX_SIDE = 400; // Profilbild wird höchstens 96 pt groß gezeigt
+export const AVATAR_TARGET_BYTES = 40_000;
 
 // B4: Deutschland, die neun Nachbarländer, Italien und Spanien (ISO 3166-1 alpha-2)
 export const ALLOWED_COUNTRIES = ['DE', 'DK', 'PL', 'CZ', 'AT', 'CH', 'FR', 'LU', 'BE', 'NL', 'IT', 'ES'];

@@ -1,23 +1,66 @@
-import { PHOTO_MAX_SIDE, PHOTO_TARGET_BYTES } from './rules';
+import { AVATAR_MAX_SIDE, AVATAR_TARGET_BYTES, PHOTO_MAX_SIDE, PHOTO_TARGET_BYTES } from './rules';
 
 // G3: Foto auf dem Gerät verkleinern. Das Neu-Kodieren über Canvas entfernt auch die EXIF-Daten (GPS).
-export async function shrinkPhoto(file: Blob, maxSide = PHOTO_MAX_SIDE): Promise<Blob> {
+// So klein wie möglich, ohne dass es pixelig wirkt: erst in Stufen sauber herunterrechnen (kein Treppeneffekt),
+// dann die JPEG-Qualität senken, aber nie unter MIN_QUALITY. Reicht das nicht, wird das Bild etwas kleiner.
+const MIN_QUALITY = 0.62; // darunter werden Blockartefakte sichtbar
+const MIN_SIDE = 900; // kleiner als das wirkt ein Foto auf dem iPhone unscharf
+
+export async function shrinkPhoto(file: Blob, kind: 'photo' | 'avatar' = 'photo'): Promise<Blob> {
+  const maxSide = kind === 'avatar' ? AVATAR_MAX_SIDE : PHOTO_MAX_SIDE;
+  const target = kind === 'avatar' ? AVATAR_TARGET_BYTES : PHOTO_TARGET_BYTES;
+  const minSide = kind === 'avatar' ? AVATAR_MAX_SIDE : MIN_SIDE;
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  let side = Math.min(maxSide, Math.max(bitmap.width, bitmap.height));
+  let best: Blob | null = null;
+  try {
+    for (;;) {
+      const canvas = resize(bitmap, side);
+      for (let q = 0.8; q >= MIN_QUALITY - 0.001; q -= 0.06) {
+        const blob = await toBlob(canvas, q);
+        if (!best || blob.size < best.size) best = blob;
+        if (blob.size <= target) return blob;
+      }
+      if (side <= minSide) return best!;
+      side = Math.max(minSide, Math.round(side * 0.85));
+    }
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** In Halbierungsschritten auf die Zielgröße rechnen: schärfer und ohne Treppen als ein einziger großer Sprung. */
+function resize(bitmap: ImageBitmap, side: number): HTMLCanvasElement {
+  const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * scale);
   const h = Math.round(bitmap.height * scale);
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
-  let quality = 0.82;
-  let blob = await toBlob(canvas, quality);
-  while (blob.size > PHOTO_TARGET_BYTES && quality > 0.5) {
-    quality -= 0.08;
-    blob = await toBlob(canvas, quality);
+  let src: CanvasImageSource = bitmap;
+  let sw = bitmap.width;
+  let sh = bitmap.height;
+  while (sw / 2 >= w && sh / 2 >= h) {
+    const step = canvasOf(Math.round(sw / 2), Math.round(sh / 2));
+    draw(step, src);
+    src = step;
+    sw = step.width;
+    sh = step.height;
   }
-  return blob;
+  const out = canvasOf(w, h);
+  draw(out, src);
+  return out;
+}
+
+function canvasOf(w: number, h: number) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  return c;
+}
+
+function draw(c: HTMLCanvasElement, src: CanvasImageSource) {
+  const g = c.getContext('2d')!;
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(src, 0, 0, c.width, c.height);
 }
 
 function toBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {

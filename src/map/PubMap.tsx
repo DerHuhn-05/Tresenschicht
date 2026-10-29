@@ -38,7 +38,6 @@ interface Props {
 // Farben für Pins und Sammel-Marker: auf der Nachtblau-Karte immer Bernstein mit Nachtblau (Design System, dunkel)
 const MARKER = tokenColor('marker', 'dark');
 const GLYPH = tokenColor('marker-glyph', 'dark');
-const DONE = tokenColor('white', 'dark');
 const RATIO = Math.min(3, Math.max(2, Math.round(globalThis.devicePixelRatio || 2)));
 
 /** Zoomen mit 75 % der normalen Geschwindigkeit: wirkt ruhiger und flüssiger. */
@@ -106,8 +105,8 @@ const GLYPH_PATHS = [
 const OPEN = tokenColor('navy-300', 'dark');
 const EDGE = tokenColor('navy-950', 'dark');
 
-/** Pin-Form aus dem Design System. Besucht: Bernstein mit Haken oben rechts (nicht nur Farbe),
- *  noch nicht besucht: Blaugrau ohne Haken. Dunkler Rand, damit sich überlappende Pins trennen lassen. */
+/** Pin-Form aus dem Design System. Besucht: Bernstein (gelb), noch nicht besucht: Blaugrau.
+ *  Dunkler Rand, damit sich überlappende Pins trennen lassen. */
 function pinImage(done: boolean) {
   const w = 44;
   const h = 52;
@@ -136,25 +135,6 @@ function pinImage(done: boolean) {
     g.stroke(path);
   });
   g.restore();
-  if (done) {
-    g.fillStyle = GLYPH;
-    g.beginPath();
-    g.arc(33, 6, 9, 0, Math.PI * 2);
-    g.fill();
-    g.strokeStyle = DONE;
-    g.lineWidth = 2;
-    g.beginPath();
-    g.arc(33, 6, 8, 0, Math.PI * 2);
-    g.stroke();
-    g.lineWidth = 2.4;
-    g.lineCap = 'round';
-    g.lineJoin = 'round';
-    g.beginPath();
-    g.moveTo(29, 6.2);
-    g.lineTo(31.8, 9);
-    g.lineTo(37, 3.4);
-    g.stroke();
-  }
   return g.getImageData(0, 0, cv.width, cv.height);
 }
 

@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { LatLon } from '../lib/geo';
 import type {
-  Api, Bounds, PubTile, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, SignUpData, User,
+  Api, Bounds, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, SignUpData, User,
 } from './types';
 
 // Echtes Backend (supabase/schema.sql). Alle Regeln prüft der Server; die App zeigt nur an.
@@ -11,6 +11,7 @@ function toPub(r: Row): Pub {
   return {
     id: r.id, name: r.name, type: r.type, lat: r.lat, lon: r.lon, address: r.address ?? '', city: r.city ?? '',
     country: r.country ?? '', status: r.status, source: r.source, openingHours: r.opening_hours ?? undefined,
+    features: r.features ?? {},
   };
 }
 
@@ -194,9 +195,19 @@ export class SupabaseApi implements Api {
     return { inArea: r.inArea, pubs: (r.pubs as Row[]).map((p) => ({ ...toPub(p), distance: p.distance })) };
   }
 
-  async searchPubs(query: string) {
+  async searchPubs(query: string, features: PubFeature[] = []) {
     if (!query.trim()) return [];
-    return (must(await this.sb.rpc('search_pubs', { q: query })) as Row[]).map(toPub);
+    return (must(await this.sb.rpc('search_pubs', { q: query, p_features: features })) as Row[]).map(toPub);
+  }
+
+  async bookmarks() {
+    const rows = must(await this.sb.from('bookmarks').select('created_at, pubs(*)').order('created_at', { ascending: false })) as Row[];
+    return rows.map((r) => toPub(r.pubs));
+  }
+
+  async setBookmark(pubId: string, on: boolean) {
+    if (on) must(await this.sb.from('bookmarks').upsert({ user_id: this.uid(), pub_id: pubId }));
+    else must(await this.sb.from('bookmarks').delete().eq('user_id', this.uid()).eq('pub_id', pubId));
   }
 
   async getPub(id: string) {
@@ -374,5 +385,33 @@ export class SupabaseApi implements Api {
 
   async reportContent(checkinId: string, reason: string) {
     must(await this.sb.from('reports').insert({ checkin_id: checkinId, user_id: this.uid(), reason }));
+  }
+
+  async blockUser(userId: string) {
+    must(await this.sb.rpc('block_user', { p_user: userId }));
+  }
+
+  async unblockUser(userId: string) {
+    must(await this.sb.from('blocks').delete().eq('user_id', this.uid()).eq('blocked_id', userId));
+  }
+
+  async blockedUsers(): Promise<PublicProfile[]> {
+    const rows = must(await this.sb.rpc('blocked_users')) as Row[];
+    return rows.map((r) => ({ id: r.id, username: r.username, avatarUrl: this.avatarUrl(r.avatar_path), friendship: 'blocked' as const }));
+  }
+
+  async reportQueue(): Promise<ReportItem[]> {
+    const rows = must(await this.sb.rpc('admin_reports')) as Row[];
+    await this.signedUrls(rows.map((r) => r.photoPath).filter(Boolean));
+    return rows.map((r) => ({
+      id: r.id, reason: r.reason, at: r.at, checkinId: r.checkinId, reporter: r.reporter, author: r.author, pubName: r.pubName,
+      note: r.note ?? undefined, bartender: r.bartender ?? undefined, drink: r.drink ?? undefined,
+      photoPath: r.photoPath ?? undefined, photoUrl: r.photoPath ? this.urlCache.get(r.photoPath) : undefined,
+    }));
+  }
+
+  async resolveReport(item: ReportItem, removeContent: boolean) {
+    if (removeContent && item.photoPath) await this.sb.storage.from('photos').remove([item.photoPath]);
+    must(await this.sb.rpc('admin_resolve_report', { p_id: item.id, p_remove: removeContent }));
   }
 }

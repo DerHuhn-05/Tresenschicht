@@ -654,6 +654,113 @@ textarea.input {
 }
 
 /* Toast */
+.legal-table {
+  border-collapse: collapse;
+  font-size: 15px;
+  line-height: 21px;
+  min-width: 560px;
+}
+.legal-table th,
+.legal-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--stroke-hairline) solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+.legal-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.legal-links {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.legal-links button {
+  min-height: var(--touch-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.badge-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: var(--stroke-hairline) solid var(--border-subtle);
+  color: var(--text-muted);
+}
+.badge-tile.is-earned {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.badge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+.is-earned .badge-icon {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.badge-title {
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 20px;
+}
+.badge-text {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-muted);
+}
+.badge-check {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
+  color: var(--on-accent-subtle);
+  font-size: 15px;
+  font-weight: 600;
+}
 .page-title {
   /* gleiche Höhe und Größe auf allen Hauptseiten */
   margin: var(--space-6) 0 var(--space-5);

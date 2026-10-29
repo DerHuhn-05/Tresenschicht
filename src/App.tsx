@@ -7,8 +7,9 @@ import { CheckInFlow } from './screens/CheckInFlow';
 import { CollectionScreen, DetailsScreen, VisitsScreen } from './screens/CollectionScreens';
 import { FriendsScreen, UserProfile } from './screens/FriendScreens';
 import { MapScreen } from './screens/MapScreen';
-import { EditProfile, LocationHelp, PrivacyScreen, ProfileScreen } from './screens/ProfileScreens';
+import { BlockedUsers, EditProfile, LocationHelp, PrivacyScreen, ProfileScreen } from './screens/ProfileScreens';
 import { AddPub, PubDetail, ReviewQueue, SearchScreen } from './screens/PubScreens';
+import { Datenschutz, Impressum } from './screens/LegalScreens';
 import { load } from './lib/storage';
 import { LOCATION_ASKED, useApp, type Route, type Tab } from './state/app';
 
@@ -20,6 +21,7 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 ];
 
 function RouteView({ r }: { r: Route }) {
+  const app = useApp();
   switch (r.kind) {
     case 'pub': return <PubDetail id={r.id} />;
     case 'search': return <SearchScreen />;
@@ -30,6 +32,9 @@ function RouteView({ r }: { r: Route }) {
     case 'review': return <ReviewQueue />;
     case 'editProfile': return <EditProfile />;
     case 'privacy': return <PrivacyScreen />;
+    case 'impressum': return <Impressum onBack={app.pop} />;
+    case 'blocked': return <BlockedUsers />;
+    case 'datenschutz': return <Datenschutz onBack={app.pop} />;
     case 'locationHelp': return <LocationHelp />;
   }
 }

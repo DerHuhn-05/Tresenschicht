@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { shrinkPhoto } from '../lib/image';
 import { Icon, type IconName } from './Icon';
 
@@ -51,7 +52,8 @@ export function Sheet({ children, onClose, label, closable = true }: { children:
       prev?.focus?.();
     };
   }, [closable, onClose]);
-  return (
+  // Direkt an die App gehängt, nicht in eine scrollbare Seite: liegt immer ganz oben und scrollt nicht mit
+  return createPortal(
     <div className="scrim">
       <div className="scrim-bg" onClick={closable ? onClose : undefined} />
       <div className="sheet" ref={ref} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
@@ -63,7 +65,8 @@ export function Sheet({ children, onClose, label, closable = true }: { children:
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.querySelector('.app') ?? document.body
   );
 }
 

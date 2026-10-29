@@ -3,6 +3,9 @@ import type { LatLon } from '../lib/geo';
 export type PubType = 'kneipe' | 'bar' | 'biergarten';
 export type PubStatus = 'aktiv' | 'geschlossen' | 'zu_pruefen';
 
+/** Ausstattung aus OpenStreetMap, für die Suchfilter */
+export type PubFeature = 'outdoor' | 'darts' | 'cards' | 'wheelchair';
+
 export interface Pub {
   id: string;
   name: string;
@@ -15,6 +18,7 @@ export interface Pub {
   status: PubStatus;
   source: 'osm' | 'nutzer';
   openingHours?: string;
+  features?: Partial<Record<PubFeature, boolean>>;
 }
 
 export interface NearbyPub extends Pub {
@@ -33,7 +37,7 @@ export interface User {
   isAdmin?: boolean;
 }
 
-export type Friendship = 'self' | 'none' | 'requested_by_me' | 'requested_by_them' | 'friends';
+export type Friendship = 'self' | 'none' | 'requested_by_me' | 'requested_by_them' | 'friends' | 'blocked';
 
 /** F3: Ohne Freundschaft sind nur Benutzername und Profilbild sichtbar. */
 export interface PublicProfile {
@@ -136,6 +140,22 @@ export interface PubTile {
   pubs?: Pub[];
 }
 
+/** Gemeldeter Beitrag in der Prüfliste */
+export interface ReportItem {
+  id: string;
+  reason: string;
+  at: string;
+  checkinId: string;
+  reporter: string;
+  author: string;
+  pubName: string;
+  note?: string;
+  bartender?: string;
+  drink?: string;
+  photoUrl?: string;
+  photoPath?: string;
+}
+
 export interface Bounds {
   west: number;
   south: number;
@@ -165,7 +185,9 @@ export interface Api {
   pubTile(z: number, x: number, y: number): Promise<PubTile>;
   nearestPubs(pos: LatLon, limit?: number): Promise<NearbyPub[]>;
   nearbyPubs(pos: LatLon, accuracy: number): Promise<NearbyResult>;
-  searchPubs(query: string): Promise<Pub[]>;
+  searchPubs(query: string, features?: PubFeature[]): Promise<Pub[]>;
+  bookmarks(): Promise<Pub[]>;
+  setBookmark(pubId: string, on: boolean): Promise<void>;
   getPub(id: string): Promise<Pub | null>;
   proposePub(p: NewPubProposal): Promise<void>;
   proposeEdit(pubId: string, patch: Partial<Pick<Pub, 'name' | 'openingHours'>>): Promise<void>;
@@ -194,4 +216,9 @@ export interface Api {
   friends(): Promise<PublicProfile[]>;
   feed(): Promise<FeedItem[]>;
   reportContent(checkinId: string, reason: string): Promise<void>;
+  blockUser(userId: string): Promise<void>;
+  unblockUser(userId: string): Promise<void>;
+  blockedUsers(): Promise<PublicProfile[]>;
+  reportQueue(): Promise<ReportItem[]>;
+  resolveReport(item: ReportItem, removeContent: boolean): Promise<void>;
 }

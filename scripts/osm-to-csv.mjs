@@ -8,7 +8,7 @@ if (!file) {
   process.exit(1);
 }
 
-const csv = (v) => `"${String(v).replace(/"/g, '""').replace(/[\r\n]+/g, ' ')}"`;
+const csv = (v) => `"${String(typeof v === 'object' ? JSON.stringify(v) : v).replace(/"/g, '""').replace(/[\r\n]+/g, ' ')}"`;
 process.stdout.write(COLUMNS.join(',') + '\n');
 let kept = 0;
 let skipped = 0;

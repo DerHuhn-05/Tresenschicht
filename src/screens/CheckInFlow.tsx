@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type CheckIn, type CheckInRefusal, type NearbyPub } from '../api';
 import { Icon } from '../components/Icon';
 import { Sheet } from '../components/ui';
+import { BadgeGrid } from '../components/Badges';
+import { badgesOf, gained, type Badge } from '../lib/badges';
 import { countdown, formatDistance, relativeTime } from '../lib/format';
 import { distanceM, type LatLon } from '../lib/geo';
 import { DECLINE_MINUTES, LEAVE_DISTANCE_M, MAX_ACCURACY_M, SAME_PUB_HOURS } from '../lib/rules';
@@ -13,7 +15,7 @@ type Phase =
   | { k: 'ask'; pub: NearbyPub; others: NearbyPub[] }
   | { k: 'choose'; pubs: NearbyPub[]; selected: string | null }
   | { k: 'saving'; pub: NearbyPub }
-  | { k: 'success'; checkin: CheckIn; lockedUntil: string; nth: number; visits: number; alternatives: NearbyPub[] }
+  | { k: 'success'; checkin: CheckIn; lockedUntil: string; nth: number; visits: number; alternatives: NearbyPub[]; badges: Badge[] }
   | { k: 'refused'; reason: CheckInRefusal; retryAt?: string };
 
 const DECLINED_KEY = 'kneipen-declined';
@@ -96,12 +98,16 @@ export function CheckInFlow() {
     if (!location.pos) return;
     setPhase({ k: 'saving', pub });
     try {
+      // Stand vorher merken, um neu erreichte Abzeichen zu zeigen
+      const before = await Promise.all([api.collection(), api.checkIns()]).then(([c, v]) => badgesOf(c, v)).catch(() => null);
       const r = await api.checkIn(pub.id, location.pos, location.accuracy ?? 999);
       if (!r.ok) return setPhase({ k: 'refused', reason: r.reason, retryAt: r.retryAt });
-      const [col, visits] = await Promise.all([api.collection(), api.checkIns(undefined, pub.id)]);
+      const [col, all] = await Promise.all([api.collection(), api.checkIns()]);
+      const visits = all.filter((c) => c.pub.id === pub.id);
       app.setLastCheckIn(r.checkin);
       app.bump();
-      setPhase({ k: 'success', checkin: r.checkin, lockedUntil: r.lockedUntil, nth: col.length, visits: visits.length, alternatives });
+      const badges = before ? gained(before, badgesOf(col, all)) : [];
+      setPhase({ k: 'success', checkin: r.checkin, lockedUntil: r.lockedUntil, nth: col.length, visits: visits.length, alternatives, badges });
     } catch (e) {
       app.notify((e as Error).message || 'Check-in hat nicht geklappt. Versuch es noch einmal.', 'error');
       setPhase({ k: 'idle' });
@@ -232,6 +238,12 @@ export function CheckInFlow() {
           Du hast jetzt {p.nth} {p.nth === 1 ? 'Kneipe' : 'Kneipen'}.
         </p>
       </div>
+      {p.badges.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <p className="t-body-strong" style={{ marginBottom: 8 }}>{p.badges.length === 1 ? 'Neues Abzeichen' : 'Neue Abzeichen'}</p>
+          <BadgeGrid badges={p.badges} />
+        </div>
+      )}
       <div className="btn-stack" style={{ marginTop: 20 }}>
         <button
           className="btn btn-primary btn-block"

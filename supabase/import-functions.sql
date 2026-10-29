@@ -19,7 +19,9 @@ begin
 end;
 $$;
 
--- D1: bis zu einige tausend Kneipen auf einmal übernehmen; Land wird hier bestimmt, Orte außerhalb fallen weg
+-- D1: bis zu einige tausend Kneipen auf einmal übernehmen; Land wird hier bestimmt, Orte außerhalb fallen weg.
+-- Übernimmt auch die Ausstattung (Außenbereich, Dart, Kartenzahlung, rollstuhlgerecht) für die Suchfilter.
+alter table public.pubs add column if not exists features jsonb not null default '{}'::jsonb;
 create or replace function public.import_pubs(p_rows jsonb) returns integer
 language plpgsql security definer set search_path = public, extensions as $$
 declare
@@ -27,15 +29,15 @@ declare
 begin
   with r as (
     select distinct on (x.osm_id) x.*
-    from jsonb_to_recordset(p_rows) as x(osm_id text, name text, type text, lat float8, lon float8, address text, city text, opening_hours text)
+    from jsonb_to_recordset(p_rows) as x(osm_id text, name text, type text, lat float8, lon float8, address text, city text, opening_hours text, features jsonb)
     where x.osm_id is not null and x.type in ('kneipe', 'bar', 'biergarten')
     order by x.osm_id
   ), located as (
     select r.*, (select c.code from countries c where st_contains(c.geom, st_setsrid(st_makepoint(r.lon, r.lat), 4326)) limit 1) as country
     from r
   )
-  insert into pubs (osm_id, name, type, lat, lon, address, city, opening_hours, country, source, updated_at)
-  select osm_id, name, type, lat, lon, coalesce(address, ''), coalesce(city, ''), nullif(opening_hours, ''), country, 'osm', now()
+  insert into pubs (osm_id, name, type, lat, lon, address, city, opening_hours, features, country, source, updated_at)
+  select osm_id, name, type, lat, lon, coalesce(address, ''), coalesce(city, ''), nullif(opening_hours, ''), coalesce(features, '{}'), country, 'osm', now()
   from located where country is not null
   on conflict (osm_id) do update set
     name = excluded.name,
@@ -45,6 +47,7 @@ begin
     address = excluded.address,
     city = excluded.city,
     opening_hours = coalesce(excluded.opening_hours, pubs.opening_hours),
+    features = excluded.features,
     country = excluded.country,
     updated_at = now()
   where pubs.source = 'osm';

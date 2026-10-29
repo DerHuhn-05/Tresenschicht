@@ -17,6 +17,9 @@ export type Route =
   | { kind: 'review' }
   | { kind: 'editProfile' }
   | { kind: 'privacy' }
+  | { kind: 'impressum' }
+  | { kind: 'blocked' }
+  | { kind: 'datenschutz' }
   | { kind: 'locationHelp' };
 
 export type LocStatus = 'off' | 'asking' | 'ok' | 'denied' | 'unavailable';

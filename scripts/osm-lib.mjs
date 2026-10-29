@@ -1,6 +1,18 @@
 // Gemeinsame Regeln für den OSM-Import: welche Orte zählen und wie sie umgewandelt werden.
 export const TYPES = { pub: 'kneipe', bar: 'bar', biergarten: 'biergarten' };
-export const COLUMNS = ['osm_id', 'name', 'type', 'lat', 'lon', 'address', 'city', 'opening_hours'];
+export const COLUMNS = ['osm_id', 'name', 'type', 'lat', 'lon', 'address', 'city', 'opening_hours', 'features'];
+
+const CARD_TAGS = ['payment:cards', 'payment:credit_cards', 'payment:debit_cards', 'payment:girocard', 'payment:maestro', 'payment:visa', 'payment:mastercard', 'payment:contactless'];
+
+/** Ausstattung für die Suchfilter; nur zutreffende Merkmale werden gespeichert. */
+export function features(t, type) {
+  const f = {};
+  if (t.outdoor_seating === 'yes' || t.beer_garden === 'yes' || type === 'biergarten') f.outdoor = true;
+  if (t.darts === 'yes' || /(^|;)\s*darts\s*(;|$)/.test(t.sport ?? '')) f.darts = true;
+  if (CARD_TAGS.some((k) => t[k] === 'yes')) f.cards = true;
+  if (t.wheelchair === 'yes') f.wheelchair = true;
+  return f;
+}
 
 export function centroid(g) {
   if (g.type === 'Point') return g.coordinates;
@@ -29,6 +41,7 @@ export function toRow(f) {
     address: [t['addr:street'] ?? t['addr:place'], t['addr:housenumber']].filter(Boolean).join(' '),
     city: t['addr:city'] ?? '',
     opening_hours: t.opening_hours ?? '',
+    features: features(t, type),
   };
 }
 

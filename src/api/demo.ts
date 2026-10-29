@@ -5,7 +5,7 @@ import { load, save } from '../lib/storage';
 import { CELLS_PER_TILE, DETAIL_ZOOM, latToTileY, lonToTileX } from '../lib/tiles';
 import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
 import type {
-  Api, PubTile, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, User,
+  Api, PubFeature, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, User,
 } from './types';
 
 // Demo-Backend: dieselben Regeln wie der Server, Daten nur im Browser (localStorage).
@@ -42,7 +42,9 @@ interface Db {
   checkins: DbCheckIn[];
   friendships: DbFriendship[];
   edits: DbEdit[];
-  reports: { checkinId: string; userId: string; reason: string; at: string }[];
+  reports: { id?: string; checkinId: string; userId: string; reason: string; at: string; status?: string }[];
+  bookmarks?: { userId: string; pubId: string; at: string }[];
+  blocks?: { userId: string; blockedId: string }[];
   session: string | null;
 }
 
@@ -261,15 +263,32 @@ export class DemoApi implements Api {
     return this.wait({ inArea: true, pubs });
   }
 
-  async searchPubs(query: string) {
+  async searchPubs(query: string, features: PubFeature[] = []) {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const words = q.split(/\s+/);
     return this.wait(
       this.db.pubs
         .filter((p) => p.status === 'aktiv' && words.every((w) => `${p.name} ${p.city} ${p.address}`.toLowerCase().includes(w)))
+        .filter((p) => features.every((f) => p.features?.[f]))
         .slice(0, 30)
     );
+  }
+
+  async bookmarks() {
+    const me = this.me().id;
+    return this.wait(
+      (this.db.bookmarks ?? []).filter((b) => b.userId === me).sort((a, b) => b.at.localeCompare(a.at)).map((b) => this.pub(b.pubId)),
+      60
+    );
+  }
+
+  async setBookmark(pubId: string, on: boolean) {
+    const me = this.me().id;
+    const list = (this.db.bookmarks ?? []).filter((b) => !(b.userId === me && b.pubId === pubId));
+    if (on) list.push({ userId: me, pubId, at: new Date().toISOString() });
+    this.db.bookmarks = list;
+    this.commit();
   }
 
   async getPub(id: string) {
@@ -412,16 +431,20 @@ export class DemoApi implements Api {
     const q = query.trim().toLowerCase().replace(/^@/, '');
     if (q.length < 2) return [];
     const me = this.me().id;
-    return this.wait(this.db.users.filter((u) => u.id !== me && u.username.toLowerCase().includes(q)).map((u) => this.profileOf(u)));
+    return this.wait(this.db.users.filter((u) => u.id !== me && !this.blockedBetween(me, u.id) && u.username.toLowerCase().includes(q)).map((u) => this.profileOf(u)));
   }
 
   async profile(userId: string) {
     const u = this.db.users.find((x) => x.id === userId);
-    return this.wait(u ? this.profileOf(u) : null);
+    const me = this.me().id;
+    if (!u || (this.db.blocks ?? []).some((x) => x.userId === userId && x.blockedId === me)) return this.wait(null);
+    if ((this.db.blocks ?? []).some((x) => x.userId === me && x.blockedId === userId)) return this.wait({ id: u.id, username: u.username, avatarUrl: u.avatarUrl, friendship: 'blocked' as const });
+    return this.wait(this.profileOf(u));
   }
 
   async sendFriendRequest(userId: string) {
     const me = this.me().id;
+    if (this.blockedBetween(me, userId)) throw new Error('Anfrage nicht möglich.');
     const r = this.relation(me, userId);
     if (r && r.from === userId && r.status === 'angefragt') r.status = 'angenommen';
     else if (!r) this.db.friendships.push({ from: me, to: userId, status: 'angefragt', at: new Date().toISOString() });
@@ -478,8 +501,59 @@ export class DemoApi implements Api {
   }
 
   async reportContent(checkinId: string, reason: string) {
-    this.db.reports.push({ checkinId, reason, userId: this.me().id, at: new Date().toISOString() });
+    this.db.reports.push({ id: uid(), checkinId, reason, userId: this.me().id, at: new Date().toISOString(), status: 'offen' });
     this.commit();
     await this.wait(null);
+  }
+
+  private blockedBetween(a: string, b: string) {
+    return (this.db.blocks ?? []).some((x) => (x.userId === a && x.blockedId === b) || (x.userId === b && x.blockedId === a));
+  }
+
+  async blockUser(userId: string) {
+    const me = this.me().id;
+    this.db.blocks = [...(this.db.blocks ?? []).filter((x) => !(x.userId === me && x.blockedId === userId)), { userId: me, blockedId: userId }];
+    this.db.friendships = this.db.friendships.filter((f) => !((f.from === me && f.to === userId) || (f.from === userId && f.to === me)));
+    this.commit();
+    await this.wait(null);
+  }
+
+  async unblockUser(userId: string) {
+    const me = this.me().id;
+    this.db.blocks = (this.db.blocks ?? []).filter((x) => !(x.userId === me && x.blockedId === userId));
+    this.commit();
+  }
+
+  async blockedUsers() {
+    const me = this.me().id;
+    const ids = (this.db.blocks ?? []).filter((x) => x.userId === me).map((x) => x.blockedId);
+    return this.wait(this.db.users.filter((u) => ids.includes(u.id)).map((u) => ({ id: u.id, username: u.username, avatarUrl: u.avatarUrl, friendship: 'blocked' as const })));
+  }
+
+  async reportQueue(): Promise<ReportItem[]> {
+    if (!this.me().isAdmin) throw new Error('Nur für die Prüfung freigeschaltete Konten.');
+    return this.wait(
+      this.db.reports
+        .filter((r) => (r.status ?? 'offen') === 'offen' && this.db.checkins.some((c) => c.id === r.checkinId))
+        .map((r) => {
+          const c = this.db.checkins.find((x) => x.id === r.checkinId)!;
+          return {
+            id: r.id ?? r.checkinId, reason: r.reason, at: r.at, checkinId: c.id,
+            reporter: this.db.users.find((u) => u.id === r.userId)?.username ?? '?',
+            author: this.db.users.find((u) => u.id === c.userId)?.username ?? '?',
+            pubName: this.pub(c.pubId).name, note: c.details?.note, bartender: c.details?.bartender, drink: c.details?.drink,
+            photoUrl: c.details?.photoUrl,
+          };
+        })
+    );
+  }
+
+  async resolveReport(item: ReportItem, removeContent: boolean) {
+    for (const r of this.db.reports) if ((r.id ?? r.checkinId) === item.id || (removeContent && r.checkinId === item.checkinId)) r.status = removeContent ? 'entfernt' : 'verworfen';
+    if (removeContent) {
+      const c = this.db.checkins.find((x) => x.id === item.checkinId);
+      if (c) c.details = undefined;
+    }
+    this.commit();
   }
 }

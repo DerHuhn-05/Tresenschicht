@@ -5,8 +5,9 @@ import { Field, Notice, Page, PhotoPicker } from '../components/ui';
 import { ageFrom } from '../lib/format';
 import { MIN_AGE } from '../lib/rules';
 import { isDemo } from '../state/app';
+import { Datenschutz, Impressum } from './LegalScreens';
 
-type AuthView = 'welcome' | 'register' | 'login' | 'reset' | 'confirm';
+type AuthView = 'welcome' | 'register' | 'login' | 'reset' | 'confirm' | 'impressum' | 'datenschutz';
 
 export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void }) {
   const [view, setView] = useState<AuthView>('welcome');
@@ -27,6 +28,8 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
     setEmail(mail);
     setView('confirm');
   };
+  if (view === 'impressum') return <Impressum onBack={() => setView('welcome')} />;
+  if (view === 'datenschutz') return <Datenschutz onBack={() => setView('welcome')} />;
   if (view === 'register') return <Register onBack={() => setView('welcome')} onDone={onDone} onConfirm={confirm} />;
   if (view === 'login') return <Login onBack={() => setView('welcome')} onDone={(u) => onDone(u, false)} onReset={() => setView('reset')} onConfirm={confirm} />;
   if (view === 'reset') return <Reset onBack={() => setView('login')} onDone={(u) => onDone(u, false)} />;
@@ -52,6 +55,10 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
           </button>
         )}
         <p className="t-legal" style={{ color: 'var(--gray-300)' }}>Ab 18 Jahren. Trink verantwortungsvoll.</p>
+        <div className="legal-links" style={{ color: 'var(--gray-300)' }}>
+          <button onClick={() => setView('datenschutz')}>Datenschutz</button>
+          <button onClick={() => setView('impressum')}>Impressum</button>
+        </div>
       </div>
     </div>
   );
@@ -60,6 +67,7 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
 const USERNAME = /^[A-Za-z0-9._]{3,24}$/;
 
 function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (u: User, isNew: boolean) => void; onConfirm: (email: string) => void }) {
+  const [privacy, setPrivacy] = useState(false);
   const [f, setF] = useState({ firstName: '', lastName: '', username: '', birthDate: '', city: '', email: '', password: '' });
   const [avatar, setAvatar] = useState<{ blob: Blob; url: string } | null>(null);
   const [consent, setConsent] = useState(false);
@@ -135,11 +143,18 @@ function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (
         </Field>
         <label className="check" style={{ marginTop: 16 }}>
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-          <span className="t-secondary">Ich bin mindestens 18 Jahre alt und habe die Datenschutzerklärung gelesen.</span>
+          <span className="t-secondary">
+            Ich bin mindestens 18 Jahre alt und habe die{' '}
+            <button type="button" className="accent-text" style={{ border: 0, background: 'none', padding: 0, font: 'inherit', textDecoration: 'underline', cursor: 'pointer' }} onClick={(e) => { e.preventDefault(); setPrivacy(true); }}>
+              Datenschutzerklärung
+            </button>{' '}
+            gelesen.
+          </span>
         </label>
         {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
         <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy}>{busy ? 'Konto wird erstellt …' : 'Konto erstellen'}</button>
       </form>
+      {privacy && <Datenschutz onBack={() => setPrivacy(false)} />}
     </Page>
   );
 }

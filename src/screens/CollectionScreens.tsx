@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, type CheckIn, type CollectionEntry } from '../api';
+import { api, type CheckIn, type CollectionEntry, type Pub } from '../api';
 import { Icon, type IconName } from '../components/Icon';
 import { Confirm, Empty, Field, Page, PhotoPicker, Spinner } from '../components/ui';
 import { formatDate, plural, relativeTime } from '../lib/format';
@@ -70,16 +70,43 @@ export function CollectionView({ entries, userId, own }: { entries: CollectionEn
 export function CollectionScreen() {
   const app = useApp();
   const [entries, setEntries] = useState<CollectionEntry[] | null>(null);
+  const [saved, setSaved] = useState<Pub[] | null>(null);
+  const [tab, setTab] = useState<'visited' | 'saved'>('visited');
   useEffect(() => {
     api.collection().then(setEntries).catch((e) => app.notify(e.message, 'error'));
+    api.bookmarks().then(setSaved).catch(() => setSaved([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.version]);
   const visits = entries?.reduce((n, e) => n + e.visits, 0) ?? 0;
+  const visited = new Set(entries?.map((e) => e.pub.id));
 
   return (
     <div className="screen">
       <h1 className="t-display page-title">Meine Kneipen</h1>
-      {!entries ? <Spinner /> : entries.length === 0 ? (
+      <div className="segmented" role="tablist" aria-label="Liste" style={{ marginBottom: 20 }}>
+        <button role="tab" aria-selected={tab === 'visited'} onClick={() => setTab('visited')}>Besucht</button>
+        <button role="tab" aria-selected={tab === 'saved'} onClick={() => setTab('saved')}>Merkliste{saved?.length ? ` (${saved.length})` : ''}</button>
+      </div>
+      {tab === 'saved' ? (
+        !saved ? <Spinner /> : saved.length === 0 ? (
+          <Empty icon="bookmark" title="Merkliste ist leer" text="Tippe bei einer Kneipe auf „Will ich hin“, dann steht sie hier." action={<button className="btn btn-secondary" onClick={() => app.push({ kind: 'search' })}>Kneipe suchen</button>} />
+        ) : (
+          <ul className="list">
+            {saved.map((p) => (
+              <li key={p.id}>
+                <button className="list-row" onClick={() => app.push({ kind: 'pub', id: p.id })}>
+                  <Icon name="bookmark" />
+                  <div className="grow">
+                    <div className="title">{p.name}</div>
+                    <div className="sub">{[p.city, visited.has(p.id) ? 'schon besucht' : null].filter(Boolean).join(' · ')}</div>
+                  </div>
+                  <span className="chev"><Icon name="chevron-right" /></span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : !entries ? <Spinner /> : entries.length === 0 ? (
         <Empty
           icon="collection"
           title="Noch keine Kneipe gesammelt"

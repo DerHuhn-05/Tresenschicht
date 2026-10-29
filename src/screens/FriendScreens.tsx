@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api, type CollectionEntry, type FeedItem, type FriendRequest, type PublicProfile } from '../api';
+import { api, type CheckIn, type CollectionEntry, type FeedItem, type FriendRequest, type PublicProfile } from '../api';
+import { BadgeGrid } from '../components/Badges';
+import { badgesOf } from '../lib/badges';
 import { Icon } from '../components/Icon';
 import { Avatar, Confirm, Empty, Page, Spinner } from '../components/ui';
 import { relativeTime } from '../lib/format';
@@ -51,7 +53,7 @@ export function FriendsScreen() {
                     <Avatar url={u.avatarUrl} name={u.username} size="sm" />
                     <div className="grow">
                       <div className="title">@{u.username}</div>
-                      <div className="sub">{{ friends: 'Befreundet', requested_by_me: 'Angefragt', requested_by_them: 'Möchte mit dir befreundet sein', none: 'Privates Profil', self: '' }[u.friendship]}</div>
+                      <div className="sub">{{ friends: 'Befreundet', requested_by_me: 'Angefragt', requested_by_them: 'Möchte mit dir befreundet sein', none: 'Privates Profil', self: '', blocked: 'Gesperrt' }[u.friendship]}</div>
                     </div>
                     <span className="chev"><Icon name="chevron-right" /></span>
                   </button>
@@ -135,13 +137,17 @@ export function UserProfile({ id }: { id: string }) {
   const app = useApp();
   const [p, setP] = useState<PublicProfile | null | undefined>(undefined);
   const [entries, setEntries] = useState<CollectionEntry[] | null>(null);
+  const [visits, setVisits] = useState<CheckIn[]>([]);
   const [remove, setRemove] = useState(false);
+  const [block, setBlock] = useState(false);
 
   useEffect(() => {
     api.profile(id).then((x) => {
       setP(x);
-      if (x && (x.friendship === 'friends' || x.friendship === 'self')) api.collection(id).then(setEntries);
-      else setEntries(null);
+      if (x && (x.friendship === 'friends' || x.friendship === 'self')) {
+        api.collection(id).then(setEntries);
+        api.checkIns(id).then(setVisits);
+      } else setEntries(null);
     });
   }, [id, app.version]);
 
@@ -159,7 +165,16 @@ export function UserProfile({ id }: { id: string }) {
         </div>
       </div>
 
-      {!friends && (
+      {p.friendship === 'blocked' && (
+        <div className="stack" style={{ marginTop: 24 }}>
+          <p className="muted">Du hast @{p.username} gesperrt. Ihr findet euch nicht in der Suche und könnt euch keine Anfragen schicken.</p>
+          <button className="btn btn-secondary btn-block" onClick={async () => { await api.unblockUser(p.id); app.notify(`@${p.username} ist entsperrt.`, 'success'); app.bump(); }}>
+            Entsperren
+          </button>
+        </div>
+      )}
+
+      {!friends && p.friendship !== 'blocked' && (
         <div className="stack" style={{ marginTop: 24 }}>
           <div className="row-gap muted"><Icon name="lock" size={20} /><span>Dieses Profil ist privat. Sammlung und Fotos sehen nur Freunde.</span></div>
           {p.friendship === 'none' && (
@@ -188,12 +203,36 @@ export function UserProfile({ id }: { id: string }) {
                 <div className="stat"><div className="n">{cityCount(entries)}</div><div className="muted">Städte</div></div>
               </div>
               {entries.length === 0 ? <p className="muted">@{p.username} hat noch keine Kneipe gesammelt.</p> : <CollectionView entries={entries} userId={p.id} own={false} />}
+              <section className="section">
+                <h2 className="t-h3 section-title">Abzeichen</h2>
+                <BadgeGrid badges={badgesOf(entries, visits)} onlyEarned />
+              </section>
             </>
           )}
           <button className="btn btn-text btn-block danger-text" style={{ marginTop: 32 }} onClick={() => setRemove(true)}>
             Freundschaft beenden
           </button>
         </>
+      )}
+      {p.friendship !== 'blocked' && (
+        <button className="btn btn-text btn-block danger-text" style={{ marginTop: friends ? 0 : 32 }} onClick={() => setBlock(true)}>
+          @{p.username} sperren
+        </button>
+      )}
+      {block && (
+        <Confirm
+          title={`@${p.username} sperren?`}
+          text={`Eine Freundschaft endet. Ihr findet euch nicht mehr in der Suche und könnt euch keine Anfragen schicken. @${p.username} erfährt nichts davon. Du kannst das jederzeit im Profil unter „Gesperrte Nutzer“ aufheben.`}
+          confirm="Sperren"
+          danger
+          onCancel={() => setBlock(false)}
+          onConfirm={async () => {
+            setBlock(false);
+            await api.blockUser(p.id);
+            app.notify(`@${p.username} ist gesperrt.`, 'success');
+            app.bump();
+          }}
+        />
       )}
       {remove && (
         <Confirm

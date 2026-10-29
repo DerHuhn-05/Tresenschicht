@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type CheckIn, type Pub, type PubType } from '../api';
+import { api, type CheckIn, type Pub, type PubFeature, type PubType, type ReportItem } from '../api';
 import { Icon, type IconName } from '../components/Icon';
 import { Confirm, Field, Notice, Page, PhotoPicker, Spinner } from '../components/ui';
 import { formatDate, formatDistance, PUB_TYPE_LABEL, relativeTime } from '../lib/format';
@@ -11,16 +11,26 @@ import { useApp } from '../state/app';
 
 export const typeIcon = (t: PubType): IconName => (t === 'bar' ? 'bar' : t === 'biergarten' ? 'biergarten' : 'pub');
 
+export const FEATURE_LABEL: Record<PubFeature, string> = {
+  outdoor: 'Außenbereich',
+  darts: 'Dart',
+  cards: 'Kartenzahlung',
+  wheelchair: 'Rollstuhlgerecht',
+};
+const FEATURES = Object.keys(FEATURE_LABEL) as PubFeature[];
+
 export function PubDetail({ id }: { id: string }) {
   const app = useApp();
   const [pub, setPub] = useState<Pub | null | undefined>(undefined);
   const [visits, setVisits] = useState<CheckIn[]>([]);
   const [edit, setEdit] = useState(false);
   const [closedAsk, setClosedAsk] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     api.getPub(id).then(setPub);
     api.checkIns(undefined, id).then(setVisits);
+    api.bookmarks().then((b) => setSaved(b.some((p) => p.id === id))).catch(() => {});
   }, [id, app.version]);
 
   if (pub === undefined) return <Page onBack={app.pop} title="Kneipe"><Spinner /></Page>;
@@ -43,6 +53,13 @@ export function PubDetail({ id }: { id: string }) {
         {dist !== null && <span>{formatDistance(dist)} entfernt</span>}
       </div>
       {pub.openingHours && <p className="t-secondary muted" style={{ marginTop: 8 }}>Öffnungszeiten: {pub.openingHours}</p>}
+      {FEATURES.some((f) => pub.features?.[f]) && (
+        <ul className="chips" style={{ marginTop: 12, padding: 0, listStyle: 'none' }} aria-label="Ausstattung">
+          {FEATURES.filter((f) => pub.features?.[f]).map((f) => (
+            <li key={f} className="tag">{FEATURE_LABEL[f]}</li>
+          ))}
+        </ul>
+      )}
       {pub.status === 'geschlossen' && (
         <div style={{ marginTop: 16 }}>
           <Notice icon="warning">Diese Kneipe ist als geschlossen gemeldet.</Notice>
@@ -61,6 +78,25 @@ export function PubDetail({ id }: { id: string }) {
           </button>
         )}
         {!near && <p className="t-caption muted">Einchecken geht vor Ort, wenn du höchstens {RADIUS_M} m entfernt bist.</p>}
+        <button
+          className="btn btn-secondary btn-block"
+          aria-pressed={saved}
+          onClick={async () => {
+            const on = !saved;
+            setSaved(on);
+            try {
+              await api.setBookmark(pub.id, on);
+              app.notify(on ? 'Auf deiner Merkliste.' : 'Von der Merkliste entfernt.', 'success');
+              app.bump();
+            } catch (e) {
+              setSaved(!on);
+              app.notify((e as Error).message, 'error');
+            }
+          }}
+        >
+          <Icon name="bookmark" />
+          {saved ? 'Gemerkt' : 'Will ich hin'}
+        </button>
       </div>
 
       <section className="section">
@@ -159,12 +195,13 @@ function EditPub({ pub, onClose }: { pub: Pub; onClose: () => void }) {
 export function SearchScreen() {
   const app = useApp();
   const [q, setQ] = useState('');
+  const [filters, setFilters] = useState<PubFeature[]>([]);
   const [results, setResults] = useState<Pub[] | null>(null);
   useEffect(() => {
     if (!q.trim()) return setResults(null);
-    const t = setTimeout(() => api.searchPubs(q).then(setResults).catch(() => setResults([])), 220);
+    const t = setTimeout(() => api.searchPubs(q, filters).then(setResults).catch(() => setResults([])), 220);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, filters]);
   return (
     <Page onBack={app.pop} title="Suchen">
       <div className="input-icon">
@@ -180,9 +217,20 @@ export function SearchScreen() {
           enterKeyHint="search"
         />
       </div>
+      <div className="chips" role="group" aria-label="Filter" style={{ marginTop: 12 }}>
+        {FEATURES.map((f) => {
+          const on = filters.includes(f);
+          return (
+            <button key={f} type="button" className="chip" aria-pressed={on} onClick={() => setFilters(on ? filters.filter((x) => x !== f) : [...filters, f])}>
+              {on && <Icon name="check" size={16} />}
+              {FEATURE_LABEL[f]}
+            </button>
+          );
+        })}
+      </div>
       <div style={{ marginTop: 20 }}>
         {results === null ? (
-          <p className="muted">Suche nach Name und Stadt. Mehrere Wörter grenzen ein.</p>
+          <p className="muted">Suche nach Name und Stadt. Mehrere Wörter grenzen ein. Die Filter zeigen nur Kneipen, bei denen die Ausstattung in OpenStreetMap eingetragen ist.</p>
         ) : results.length === 0 ? (
           <div className="stack">
             <p>Keine Kneipe gefunden.</p>
@@ -322,7 +370,11 @@ export function AddPub({ pos }: { pos?: LatLon }) {
 export function ReviewQueue() {
   const app = useApp();
   const [items, setItems] = useState<Awaited<ReturnType<typeof api.reviewQueue>> | null>(null);
-  const reload = () => api.reviewQueue().then(setItems).catch((e) => app.notify(e.message, 'error'));
+  const [reports, setReports] = useState<ReportItem[] | null>(null);
+  const reload = () => {
+    api.reviewQueue().then(setItems).catch((e) => app.notify(e.message, 'error'));
+    api.reportQueue().then(setReports).catch(() => setReports([]));
+  };
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,6 +382,28 @@ export function ReviewQueue() {
   const kindLabel = { neu: 'Neue Kneipe', aenderung: 'Änderung', geschlossen: 'Geschlossen gemeldet' };
   return (
     <Page onBack={app.pop} title="Prüfliste" subtle>
+      <h2 className="t-h3 section-title">Gemeldete Beiträge</h2>
+      {!reports ? <Spinner /> : reports.length === 0 ? (
+        <p className="muted" style={{ marginBottom: 24 }}>Keine Meldungen.</p>
+      ) : (
+        <div style={{ marginBottom: 24 }}>
+          {reports.map((r) => (
+            <div className="feed-item" key={r.id}>
+              <p className="t-caption muted">Gemeldet von @{r.reporter} · {relativeTime(r.at)}</p>
+              <h3 className="t-body-strong" style={{ marginTop: 4 }}>@{r.author} im {r.pubName}</h3>
+              {(r.drink || r.bartender) && <p className="t-secondary muted">{[r.drink, r.bartender && `Barkeeper: ${r.bartender}`].filter(Boolean).join(' · ')}</p>}
+              {r.note && <p style={{ marginTop: 4 }}>{r.note}</p>}
+              {r.photoUrl && <img className="feed-photo" src={r.photoUrl} alt={`Gemeldetes Foto von ${r.author}`} />}
+              {!r.note && !r.photoUrl && !r.drink && !r.bartender && <p className="muted t-secondary">Der Beitrag hat keinen Text und kein Foto mehr.</p>}
+              <div className="row-gap" style={{ marginTop: 12 }}>
+                <button className="btn btn-danger" onClick={async () => { await api.resolveReport(r, true); app.notify('Text und Foto entfernt.', 'success'); reload(); }}>Inhalt entfernen</button>
+                <button className="btn btn-secondary" onClick={async () => { await api.resolveReport(r, false); reload(); }}>Meldung verwerfen</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <h2 className="t-h3 section-title">Kneipen</h2>
       {!items ? <Spinner /> : items.length === 0 ? (
         <p className="muted">Nichts zu prüfen.</p>
       ) : (

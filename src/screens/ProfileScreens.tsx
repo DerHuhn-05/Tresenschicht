@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { api, type CheckIn, type CollectionEntry } from '../api';
+import { api, type CheckIn, type CollectionEntry, type PublicProfile } from '../api';
 import { Icon, type IconName } from '../components/Icon';
 import { Avatar, Confirm, Field, Notice, Page, PhotoPicker, Spinner } from '../components/ui';
 import { remove } from '../lib/storage';
 import { isDemo, useApp } from '../state/app';
+import { BadgeGrid } from '../components/Badges';
+import { badgesOf } from '../lib/badges';
 import { cityCount, VisitCard } from './CollectionScreens';
 
 function Row({ icon, title, sub, onClick, danger }: { icon: IconName; title: string; sub?: string; onClick: () => void; danger?: boolean }) {
@@ -25,13 +27,27 @@ export function ProfileScreen() {
   const app = useApp();
   const u = app.user!;
   const [entries, setEntries] = useState<CollectionEntry[] | null>(null);
-  const [recent, setRecent] = useState<CheckIn[]>([]);
+  const [all, setAll] = useState<CheckIn[]>([]);
   const [ask, setAsk] = useState<'logout' | 'delete' | null>(null);
 
   useEffect(() => {
     api.collection().then(setEntries);
-    api.checkIns().then((c) => setRecent(c.slice(0, 3)));
+    api.checkIns().then(setAll);
   }, [app.version]);
+  const recent = all.slice(0, 3);
+  const year = new Date().getFullYear();
+  const thisYear = {
+    visits: all.filter((c) => new Date(c.at).getFullYear() === year).length,
+    newPubs: entries?.filter((e) => new Date(e.firstAt).getFullYear() === year).length ?? 0,
+  };
+  const topCities = Object.entries(
+    (entries ?? []).reduce<Record<string, number>>((m, e) => {
+      if (e.pub.city) m[e.pub.city] = (m[e.pub.city] ?? 0) + 1;
+      return m;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
 
   const countries = new Set(entries?.map((e) => e.pub.country)).size;
   const visits = entries?.reduce((n, e) => n + e.visits, 0) ?? 0;
@@ -65,6 +81,34 @@ export function ProfileScreen() {
         </section>
       )}
 
+      {entries && (
+        <section className="section">
+          <h2 className="t-h3 section-title">{year}</h2>
+          <div className="stats">
+            <div className="stat"><div className="n">{thisYear.newPubs}</div><div className="muted">{thisYear.newPubs === 1 ? 'neue Kneipe' : 'neue Kneipen'}</div></div>
+            <div className="stat"><div className="n">{thisYear.visits}</div><div className="muted">{thisYear.visits === 1 ? 'Besuch' : 'Besuche'}</div></div>
+          </div>
+          {topCities.length > 0 && (
+            <ul className="list" style={{ marginTop: 12 }} aria-label="Meistbesuchte Städte">
+              {topCities.map(([city, n]) => (
+                <li key={city} className="list-row" style={{ cursor: 'default' }}>
+                  <Icon name="city" />
+                  <div className="grow"><div className="title">{city}</div></div>
+                  <span className="muted">{n} {n === 1 ? 'Kneipe' : 'Kneipen'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {entries && (
+        <section className="section">
+          <h2 className="t-h3 section-title">Abzeichen</h2>
+          <BadgeGrid badges={badgesOf(entries, all)} />
+        </section>
+      )}
+
       {recent.length > 0 && (
         <section className="section">
           <h2 className="t-h3 section-title">Zuletzt</h2>
@@ -78,7 +122,10 @@ export function ProfileScreen() {
           <Row icon="edit" title="Profil bearbeiten" onClick={() => app.push({ kind: 'editProfile' })} />
           <Row icon="location" title="Standort" sub={locText} onClick={() => app.push({ kind: 'locationHelp' })} />
           <Row icon="lock" title="Privatsphäre und Datenschutz" sub="Dein Profil ist privat" onClick={() => app.push({ kind: 'privacy' })} />
+          <Row icon="close" title="Gesperrte Nutzer" onClick={() => app.push({ kind: 'blocked' })} />
           {u.isAdmin && <Row icon="flag" title="Prüfliste" sub="Neue Kneipen und Änderungen" onClick={() => app.push({ kind: 'review' })} />}
+          <Row icon="info" title="Datenschutzerklärung" onClick={() => app.push({ kind: 'datenschutz' })} />
+          <Row icon="info" title="Impressum" onClick={() => app.push({ kind: 'impressum' })} />
           <Row icon="logout" title="Abmelden" onClick={() => setAsk('logout')} />
           <Row icon="delete" title="Konto löschen" onClick={() => setAsk('delete')} danger />
         </ul>
@@ -192,7 +239,9 @@ export function PrivacyScreen() {
         <p>Fotos liegen verkleinert auf unserem Server in der EU, damit deine Freunde sie sehen können. Den Aufnahmeort entfernen wir vor dem Hochladen. Löschst du einen Besuch, löschen wir das Foto mit.</p>
         <h2 className="t-h3" style={{ marginTop: 32 }}>Verantwortungsvoll</h2>
         <p>Die App ist ab 18. Es gibt keine Ranglisten nach Menge. Alkoholfreie Getränke zählen genauso.</p>
-        <p className="t-caption muted" style={{ marginTop: 32 }}>Die vollständige Datenschutzerklärung und das Impressum stehen vor dem Start hier.</p>
+        <button className="btn btn-secondary btn-block" style={{ marginTop: 32 }} onClick={() => app.push({ kind: 'datenschutz' })}>
+          Vollständige Datenschutzerklärung
+        </button>
       </div>
     </Page>
   );
@@ -258,6 +307,43 @@ export function LocationHelp() {
           {blocked ? 'Noch einmal versuchen' : s === 'ok' ? 'Standort aktualisieren' : 'Standort erlauben'}
         </button>
       </div>
+    </Page>
+  );
+}
+
+export function BlockedUsers() {
+  const app = useApp();
+  const [list, setList] = useState<PublicProfile[] | null>(null);
+  const reload = () => api.blockedUsers().then(setList).catch((e) => app.notify((e as Error).message, 'error'));
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <Page onBack={app.pop} title="Gesperrte Nutzer">
+      <p className="muted" style={{ marginBottom: 20 }}>Gesperrte Nutzer finden dich nicht in der Suche und können dir keine Anfrage schicken. Sie erfahren nichts davon.</p>
+      {!list ? <Spinner /> : list.length === 0 ? (
+        <p className="muted">Du hast niemanden gesperrt.</p>
+      ) : (
+        <ul className="list">
+          {list.map((u) => (
+            <li key={u.id} className="list-row" style={{ cursor: 'default' }}>
+              <Avatar url={u.avatarUrl} name={u.username} size="sm" />
+              <div className="grow"><div className="title">@{u.username}</div></div>
+              <button
+                className="btn btn-text"
+                onClick={async () => {
+                  await api.unblockUser(u.id);
+                  app.notify(`@${u.username} ist entsperrt.`, 'success');
+                  reload();
+                }}
+              >
+                Entsperren
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </Page>
   );
 }

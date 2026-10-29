@@ -2,13 +2,13 @@
 -- Nutzer-Einträge (source = 'nutzer') bleiben unberührt; Kneipen mit Check-ins werden nie gelöscht.
 \set ON_ERROR_STOP 1
 
-create temp table staging (osm_id text, name text, type text, lat float8, lon float8, address text, city text, opening_hours text);
+create temp table staging (osm_id text, name text, type text, lat float8, lon float8, address text, city text, opening_hours text, features jsonb);
 \copy staging from 'pubs.csv' with (format csv, header true)
 
 begin;
 
-insert into public.pubs (osm_id, name, type, lat, lon, address, city, opening_hours, source)
-select distinct on (osm_id) osm_id, name, type, lat, lon, coalesce(address, ''), coalesce(city, ''), nullif(opening_hours, ''), 'osm'
+insert into public.pubs (osm_id, name, type, lat, lon, address, city, opening_hours, features, source)
+select distinct on (osm_id) osm_id, name, type, lat, lon, coalesce(address, ''), coalesce(city, ''), nullif(opening_hours, ''), coalesce(features, '{}'), 'osm'
 from staging
 order by osm_id
 on conflict (osm_id) do update set
@@ -19,6 +19,7 @@ on conflict (osm_id) do update set
   address = excluded.address,
   city = excluded.city,
   opening_hours = coalesce(excluded.opening_hours, pubs.opening_hours),
+  features = excluded.features,
   updated_at = now()
 where pubs.source = 'osm';
 

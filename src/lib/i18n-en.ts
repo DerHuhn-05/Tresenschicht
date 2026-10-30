@@ -474,4 +474,12 @@ export const EN: Record<string, string> = {
   "Freunde, die hier waren": "Friends who have been here",
   "Meldung des Geräts": "Message from your device",
   "Dein iPhone findet gerade keinen Standort. Geh kurz ans Fenster oder vor die Tür.": "Your iPhone can't find a location right now. Step to a window or outside briefly.",
+  "Dieser Browser kann keinen Standort abfragen.": "This browser can't request a location.",
+  "Standort gefunden, Genauigkeit etwa {n} m.": "Location found, accuracy about {n} m.",
+  "Abgelehnt: iOS oder Safari gibt den Standort für diese Seite nicht frei. Prüf die Schritte unten, vor allem Schritt 3.": "Denied: iOS or Safari doesn't release the location for this site. Check the steps below, especially step 3.",
+  "Zeit abgelaufen: kein Standort in 15 Sekunden. Geh kurz ans Fenster oder vor die Tür.": "Timed out: no location within 15 seconds. Step to a window or outside briefly.",
+  "Kein Signal: Das iPhone findet gerade keinen Standort.": "No signal: your iPhone can't find a location right now.",
+  "Code": "code",
+  "Standort wird abgefragt …": "Requesting location …",
+  "Standort jetzt testen": "Test location now",
 };

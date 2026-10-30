@@ -274,6 +274,45 @@ export function PrivacyScreen() {
   );
 }
 
+/** Standort direkt beim Tippen abfragen (iOS verlangt dafür teils eine Berührung) und das Ergebnis zeigen */
+function LocationTest() {
+  const app = useApp();
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  function test() {
+    if (!('geolocation' in navigator)) return setResult({ ok: false, text: t('Dieser Browser kann keinen Standort abfragen.') });
+    setBusy(true);
+    setResult(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setBusy(false);
+        setResult({ ok: true, text: t('Standort gefunden, Genauigkeit etwa {n} m.', { n: Math.round(p.coords.accuracy) }) });
+        app.requestLocation();
+      },
+      (e) => {
+        setBusy(false);
+        const why =
+          e.code === e.PERMISSION_DENIED
+            ? t('Abgelehnt: iOS oder Safari gibt den Standort für diese Seite nicht frei. Prüf die Schritte unten, vor allem Schritt 3.')
+            : e.code === e.TIMEOUT
+              ? t('Zeit abgelaufen: kein Standort in 15 Sekunden. Geh kurz ans Fenster oder vor die Tür.')
+              : t('Kein Signal: Das iPhone findet gerade keinen Standort.');
+        setResult({ ok: false, text: `${why} (${t('Code')} ${e.code}${e.message ? `: ${e.message}` : ''})` });
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 }
+    );
+  }
+  return (
+    <div className="stack">
+      <button className="btn btn-secondary btn-block" disabled={busy} onClick={test}>
+        <Icon name="location" size={20} />
+        {busy ? t('Standort wird abgefragt …') : t('Standort jetzt testen')}
+      </button>
+      {result && <Notice icon={result.ok ? 'success' : 'warning'}>{result.text}</Notice>}
+    </div>
+  );
+}
+
 export function LocationHelp() {
   const app = useApp();
   const s = app.location.status;
@@ -308,10 +347,21 @@ export function LocationHelp() {
                   Settings → <strong>Apps</strong> → <strong>Safari</strong> (on older iOS directly <strong>Safari</strong>) → at the bottom under
                   “Settings for Websites” → <strong>Location</strong> → <strong>Ask</strong> or <strong>Allow</strong>.
                 </p>
-                <h2 className="t-h3" style={{ marginTop: 8 }}>3. Reopen the app</h2>
+                <h2 className="t-h3" style={{ marginTop: 8 }}>3. This website in Safari</h2>
                 <p>
-                  Close the app completely (swipe up from the bottom edge and push the app away) and open it again from the Home Screen. Your
-                  iPhone will then ask again.
+                  If you once tapped “Don’t Allow”, Safari remembers that for this site. Open <strong>derhuhn-05.github.io/Tresenschicht</strong> in
+                  Safari, tap <strong>aA</strong> (or the page icon) in the address bar → <strong>Website Settings</strong> → <strong>Location</strong> →{' '}
+                  <strong>Allow</strong>.
+                </p>
+                <h2 className="t-h3" style={{ marginTop: 8 }}>4. Screen Time</h2>
+                <p>
+                  Settings → <strong>Screen Time</strong> → <strong>Content &amp; Privacy Restrictions</strong> → <strong>Location Services</strong> must
+                  be set to <strong>Allow Changes</strong> (only relevant if Screen Time restrictions are on).
+                </p>
+                <h2 className="t-h3" style={{ marginTop: 8 }}>5. Reopen or re-add the app</h2>
+                <p>
+                  Close the app completely and open it again. If that doesn’t help: delete the app from the Home Screen, open the page in{' '}
+                  <strong>Safari</strong> and add it again via <strong>Share → Add to Home Screen</strong>. This resets the app’s saved permissions.
                 </p>
               </>
             ) : (
@@ -327,10 +377,22 @@ export function LocationHelp() {
                   Einstellungen → <strong>Apps</strong> → <strong>Safari</strong> (bei älterem iOS direkt <strong>Safari</strong>) → ganz unten
                   unter „Einstellungen für Websites“ → <strong>Standort</strong> → <strong>Fragen</strong> oder <strong>Erlauben</strong>.
                 </p>
-                <h2 className="t-h3" style={{ marginTop: 8 }}>3. App neu öffnen</h2>
+                <h2 className="t-h3" style={{ marginTop: 8 }}>3. Diese Website in Safari</h2>
                 <p>
-                  Die App ganz schließen (vom unteren Rand nach oben wischen und die App nach oben wegschieben) und vom Home-Bildschirm neu
-                  öffnen. Dann fragt dein iPhone noch einmal.
+                  Hast du einmal „Nicht erlauben“ getippt, merkt sich Safari das für diese Seite. Öffne <strong>derhuhn-05.github.io/Tresenschicht</strong>{' '}
+                  in Safari, tippe links in der Adressleiste auf <strong>aA</strong> (bzw. das Seiten-Symbol) → <strong>Website-Einstellungen</strong> →{' '}
+                  <strong>Standort</strong> → <strong>Erlauben</strong>.
+                </p>
+                <h2 className="t-h3" style={{ marginTop: 8 }}>4. Bildschirmzeit</h2>
+                <p>
+                  Einstellungen → <strong>Bildschirmzeit</strong> → <strong>Beschränkungen</strong> → <strong>Ortungsdienste</strong> muss auf{' '}
+                  <strong>Änderungen erlauben</strong> stehen (nur wichtig, wenn Bildschirmzeit-Beschränkungen an sind).
+                </p>
+                <h2 className="t-h3" style={{ marginTop: 8 }}>5. App neu öffnen oder neu hinzufügen</h2>
+                <p>
+                  Die App ganz schließen (vom unteren Rand nach oben wischen und wegschieben) und neu öffnen. Hilft das nicht: App vom
+                  Home-Bildschirm löschen, die Seite in <strong>Safari</strong> öffnen und über <strong>Teilen → Zum Home-Bildschirm</strong> neu
+                  hinzufügen. Dabei werden die gespeicherten Freigaben der App zurückgesetzt.
                 </p>
               </>
             )}
@@ -341,6 +403,7 @@ export function LocationHelp() {
             {t('Dein iPhone fragt gleich, ob Tresenschicht deinen Standort verwenden darf. Wähle „Erlauben“. Auf dem iPhone fragt eine Web-App bei jedem Öffnen neu, das ist eine Vorgabe von iOS.')}
           </p>
         )}
+        <LocationTest />
         {app.location.error && s !== 'ok' && (
           <p className="t-caption muted">{t('Meldung des Geräts')}: {app.location.error}</p>
         )}

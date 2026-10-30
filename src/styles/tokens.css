@@ -11,12 +11,12 @@
   --space-10: 40px;
   --space-12: 48px;
   --space-16: 64px;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
   --radius-full: 999px;
   --touch-min: 44px;
-  --button-height: 52px;
+  --button-height: 54px;
   --row-height: 56px;
   --icon-sm: 20px;
   --icon-md: 24px;

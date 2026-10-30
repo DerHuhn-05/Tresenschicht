@@ -177,9 +177,10 @@ img {
   gap: var(--space-2);
   min-height: var(--button-height);
   min-width: 120px;
-  padding: var(--space-3) var(--space-6);
+  /* Pillenform: links und rechts genug Luft, damit Icons nicht in die Rundung rutschen */
+  padding: var(--space-3) var(--space-8);
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   font-size: 17px;
   line-height: 22px;
   font-weight: 700;
@@ -206,7 +207,7 @@ img {
 .btn-text {
   min-height: var(--touch-min);
   min-width: var(--touch-min);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   background: transparent;
   color: var(--text-accent);
 }
@@ -236,7 +237,7 @@ img {
   height: var(--touch-min);
   flex: none;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -245,12 +246,12 @@ img {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--touch-min);
-  min-width: var(--touch-min);
+  min-height: 48px;
+  min-width: 48px;
   justify-content: center;
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-4);
   border: var(--stroke-strong) solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--text);
   font-weight: 600;
@@ -352,15 +353,15 @@ textarea.input {
   display: flex;
   padding: var(--space-1);
   gap: var(--space-1);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   background: var(--bg-subtle);
   border: var(--stroke-hairline) solid var(--border-subtle);
 }
 .segmented button {
   flex: 1;
-  min-height: 40px;
+  min-height: 42px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-muted);
   font-weight: 600;
@@ -383,9 +384,9 @@ textarea.input {
   align-items: center;
   gap: var(--space-2);
   min-height: var(--touch-min);
-  padding: 0 var(--space-4) 0 var(--space-3);
+  padding: 0 var(--space-5) 0 var(--space-4);
   border: var(--stroke-strong) solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--text);
   font-weight: 600;
@@ -917,10 +918,10 @@ textarea.input {
   align-items: center;
   gap: var(--space-2);
   flex: 1;
-  min-height: var(--touch-min);
-  padding: 0 var(--space-3);
+  min-height: 48px;
+  padding: 0 var(--space-5) 0 var(--space-4);
   border: var(--stroke-strong) solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--text-muted);
   font-size: 17px;
@@ -1396,8 +1397,8 @@ textarea.input {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
 }
-.category-chips .chip { justify-content: flex-start; min-height: 48px; }
-.chips-small .chip { padding: 0 var(--space-3); font-size: 14px; }
+.category-chips .chip { justify-content: flex-start; min-height: 52px; padding-left: var(--space-5); }
+.chips-small .chip { padding: 0 var(--space-4); font-size: 14px; }
 
 /* Kneipenseite: gesammelt oder nicht, dazu drei Kennzahlen */
 .collect-state {

@@ -5,8 +5,9 @@ import { load, save } from '../lib/storage';
 import { CELLS_PER_TILE, DETAIL_ZOOM, latToTileY, lonToTileX } from '../lib/tiles';
 import { DEMO_FRIENDS, DEMO_PUBS } from './demoData';
 import { groupFriends, searchFilter } from './search';
+import { NOTIFY_DEFAULTS } from './types';
 import type {
-  Api, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, FriendAtPub, ReviewLinkEdit, ReviewNews, User,
+  Api, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, Pub, PubEdit, PublicProfile, AppNotification, FriendAtPub, NotifyPrefs, ReviewLinkEdit, ReviewNews, User,
 } from './types';
 import { t } from '../lib/i18n';
 
@@ -549,6 +550,45 @@ export class DemoApi implements Api {
       .map((f) => (f.from === me ? f.to : f.from));
     return this.wait(this.db.users.filter((u) => ids.includes(u.id)).map((u) => this.profileOf(u)));
   }
+
+  // Mitteilungen: im Demo-Modus aus Anfragen und geprüften Vorschlägen abgeleitet, Push gibt es nicht
+  async notifications(): Promise<AppNotification[]> {
+    const me = this.me().id;
+    const read = new Set(load<string[]>('kneipen-demo-read', []));
+    const list: AppNotification[] = [
+      ...this.db.friendships.filter((f) => f.to === me && f.status === 'angefragt').map((f) => {
+        const u = this.db.users.find((x) => x.id === f.from)!;
+        return { id: `fr-${f.from}`, kind: 'friend_request' as const, data: { user_id: u.id, username: u.username }, at: f.at, read: false };
+      }),
+      ...this.db.edits.filter((e) => e.userId === me && e.status !== 'offen').map((e) => ({
+        id: `ed-${e.id}`, kind: (e.status === 'angenommen' ? 'pub_approved' : 'pub_rejected') as AppNotification['kind'],
+        data: { edit_id: e.id, edit_kind: e.kind, pub_id: e.pubId ?? null, pub_name: e.proposal.name ?? (e.pubId ? this.pub(e.pubId)?.name : '') ?? '' }, at: e.at, read: false,
+      })),
+    ];
+    return this.wait(list.map((n) => ({ ...n, read: read.has(n.id) })).sort((a, b) => b.at.localeCompare(a.at)));
+  }
+
+  async markNotificationsRead() {
+    save('kneipen-demo-read', (await this.notifications()).map((n) => n.id));
+  }
+
+  async notifyPrefs(): Promise<NotifyPrefs> {
+    return this.wait({ ...NOTIFY_DEFAULTS, ...load<Partial<NotifyPrefs>>('kneipen-demo-notify', {}) });
+  }
+
+  async setNotifyPrefs(prefs: NotifyPrefs) {
+    save('kneipen-demo-notify', prefs);
+  }
+
+  async pushKey() {
+    return null;
+  }
+
+  async savePushSubscription() {}
+
+  async removePushSubscription() {}
+
+  flushPush() {}
 
   async friendsAtPub(pubId: string): Promise<FriendAtPub[]> {
     const friends = new Map((await this.friends()).map((f) => [f.id, f]));

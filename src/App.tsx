@@ -11,6 +11,8 @@ import { BlockedUsers, EditProfile, LocationHelp, PrivacyScreen, ProfileScreen }
 import { AddPub, PubDetail, ReviewQueue, SearchScreen } from './screens/PubScreens';
 import { Datenschutz, Impressum } from './screens/LegalScreens';
 import { HelpScreen } from './screens/HelpScreen';
+import { NotificationsScreen, NotifySettings } from './screens/NotificationScreens';
+import { refreshPush, setBadge } from './lib/push';
 import { load } from './lib/storage';
 import { LOCATION_ASKED, useApp, type Route, type Tab } from './state/app';
 import { t } from './lib/i18n';
@@ -39,6 +41,8 @@ function RouteView({ r }: { r: Route }) {
     case 'datenschutz': return <Datenschutz onBack={app.pop} />;
     case 'locationHelp': return <LocationHelp />;
     case 'help': return <HelpScreen />;
+    case 'notifications': return <NotificationsScreen />;
+    case 'notifySettings': return <NotifySettings />;
   }
 }
 
@@ -54,6 +58,37 @@ export function App() {
     if (!app.user) return;
     api.friendRequests().then((r) => setRequests(r.length)).catch(() => {});
   }, [app.user, app.version]);
+
+  // Mitteilungen: Push-Anmeldung auffrischen, anstehende Push verschicken, Zahl am Icon
+  useEffect(() => {
+    if (!app.user) return;
+    refreshPush();
+    api.flushPush();
+  }, [app.user?.id]);
+  useEffect(() => {
+    if (!app.user) return;
+    api.notifications().then((l) => setBadge(l.filter((n) => !n.read).length)).catch(() => {});
+  }, [app.user, app.version]);
+
+  // Tipp auf eine Push-Mitteilung: ?open=user:<id> | pub:<id> | review | notifications
+  useEffect(() => {
+    if (!app.user) return;
+    const open = (url: string) => {
+      const v = new URL(url, location.href).searchParams.get('open');
+      if (!v) return;
+      const [k, id] = v.split(':');
+      if (k === 'user' && id) app.push({ kind: 'user', id });
+      else if (k === 'pub' && id) app.push({ kind: 'pub', id });
+      else if (k === 'review') app.push({ kind: 'review' });
+      else app.push({ kind: 'notifications' });
+    };
+    open(location.href);
+    if (new URLSearchParams(location.search).has('open')) history.replaceState(null, '', location.pathname);
+    const onMsg = (e: MessageEvent) => e.data?.type === 'open' && open(e.data.url);
+    navigator.serviceWorker?.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.user?.id]);
 
   // Rückmeldung zu eigenen Vorschlägen, sobald sie geprüft sind
   useEffect(() => {

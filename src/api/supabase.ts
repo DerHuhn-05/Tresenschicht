@@ -1,10 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { LatLon } from '../lib/geo';
 import type {
-  Api, Bounds, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, FriendAtPub, ReviewLinkEdit, ReviewNews, SignUpData, User,
+  Api, Bounds, CountryTotal, PubSearch, PubTile, ReportItem, CheckIn, CheckInDetails, CheckInResult, CollectionEntry, FeedItem, FriendRequest, NearbyResult, Pub, PubEdit, PublicProfile, AppNotification, FriendAtPub, NotifyPrefs, ReviewLinkEdit, ReviewNews, SignUpData, User,
 } from './types';
 import { t } from '../lib/i18n';
 import { groupFriends, searchFilter } from './search';
+import { NOTIFY_DEFAULTS } from './types';
 
 // Echtes Backend (supabase/schema.sql). Alle Regeln prüft der Server; die App zeigt nur an.
 type Row = Record<string, any>;
@@ -277,6 +278,7 @@ export class SupabaseApi implements Api {
   /** Hinweis-Mail an die Prüfadresse. Läuft im Hintergrund: scheitert sie, bleibt der Vorschlag trotzdem in der Prüfliste. */
   private mailReview(editId: string) {
     this.sb.functions.invoke('pub-review', { body: { action: 'notify', editId } }).catch(() => {});
+    this.flushPush(); // Admins per Push
   }
 
   private async reviewCall<T>(body: Record<string, unknown>): Promise<T> {
@@ -314,6 +316,7 @@ export class SupabaseApi implements Api {
 
   async review(id: string, accept: boolean) {
     must(await this.sb.rpc('review_edit', { p_id: id, p_accept: accept }));
+    this.flushPush();
   }
 
   // Check-in
@@ -341,6 +344,7 @@ export class SupabaseApi implements Api {
   async checkIn(pubId: string, pos: LatLon, accuracy: number): Promise<CheckInResult> {
     const r = must(await this.sb.rpc('check_in', { p_pub: pubId, p_lat: pos.lat, p_lon: pos.lon, p_accuracy: accuracy })) as Row;
     if (!r.ok) return { ok: false, reason: r.reason, retryAt: r.retryAt };
+    this.flushPush(); // Freunde, die das eingeschaltet haben
     const pub = (await this.getPub(pubId))!;
     return { ok: true, lockedUntil: r.lockedUntil, checkin: { id: r.id, userId: this.uid(), pub, at: r.at, accuracy: Math.round(accuracy) } };
   }
@@ -415,12 +419,14 @@ export class SupabaseApi implements Api {
 
   async sendFriendRequest(userId: string) {
     must(await this.sb.rpc('send_friend_request', { p_user: userId }));
+    this.flushPush();
   }
 
   async respondFriendRequest(userId: string, accept: boolean) {
     const q = this.sb.from('friendships');
     if (accept) must(await q.update({ status: 'angenommen' }).eq('user_id', userId).eq('other_id', this.uid()));
     else must(await q.delete().eq('user_id', userId).eq('other_id', this.uid()));
+    if (accept) this.flushPush();
   }
 
   async removeFriend(userId: string) {
@@ -439,6 +445,46 @@ export class SupabaseApi implements Api {
       id: r.id, username: r.username, avatarUrl: this.avatarUrl(r.avatar_path), friendship: 'friends' as const,
       firstName: r.first_name, lastName: r.last_name, city: r.city,
     }));
+  }
+
+  // Mitteilungen
+  async notifications(): Promise<AppNotification[]> {
+    const rows = must(await this.sb.from('notifications').select('id, kind, data, created_at, read_at').order('created_at', { ascending: false }).limit(60)) as Row[];
+    return rows.map((r) => ({ id: r.id, kind: r.kind, data: r.data ?? {}, at: r.created_at, read: !!r.read_at }));
+  }
+
+  async markNotificationsRead() {
+    must(await this.sb.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', this.uid()).is('read_at', null));
+  }
+
+  async notifyPrefs(): Promise<NotifyPrefs> {
+    const r = must(await this.sb.from('profiles').select('notify').eq('id', this.uid()).single()) as Row;
+    return { ...NOTIFY_DEFAULTS, ...(r.notify ?? {}) };
+  }
+
+  async setNotifyPrefs(prefs: NotifyPrefs) {
+    must(await this.sb.from('profiles').update({ notify: prefs }).eq('id', this.uid()));
+  }
+
+  async pushKey() {
+    const { data, error } = await this.sb.functions.invoke('push', { body: { action: 'key' } });
+    if (error || !data?.publicKey) throw new Error(t('Mitteilungen sind auf dem Server noch nicht eingerichtet.'));
+    return data.publicKey as string;
+  }
+
+  async savePushSubscription(sub: PushSubscriptionJSON, lang: string) {
+    must(await this.sb.from('push_subscriptions').upsert(
+      { user_id: this.uid(), endpoint: sub.endpoint, p256dh: sub.keys?.p256dh, auth: sub.keys?.auth, lang },
+      { onConflict: 'endpoint' }
+    ));
+  }
+
+  async removePushSubscription(endpoint: string) {
+    must(await this.sb.from('push_subscriptions').delete().eq('endpoint', endpoint));
+  }
+
+  flushPush() {
+    this.sb.functions.invoke('push', { body: { action: 'flush' } }).catch(() => {});
   }
 
   async friendsAtPub(pubId: string): Promise<FriendAtPub[]> {

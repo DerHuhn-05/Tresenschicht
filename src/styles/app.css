@@ -1450,3 +1450,18 @@ button.pub-stat { cursor: pointer; }
   border-color: rgba(245, 163, 26, 0.6);
 }
 .pub-stat.is-hot .n { color: var(--text-accent); }
+
+/* Glocke neben der Überschrift „Freunde“ */
+.bell-btn { position: relative; width: 48px; height: 48px; border: var(--stroke-hairline) solid var(--border-subtle); background: var(--surface); }
+.bell-btn .badge { position: absolute; top: -2px; right: -2px; }
+.list-row.unread .title { font-weight: 700; }
+.list-row.unread::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: -4px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+.list-row:disabled { cursor: default; opacity: 1; }

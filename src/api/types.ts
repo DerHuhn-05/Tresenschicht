@@ -127,6 +127,20 @@ export interface NewPubProposal {
 }
 
 /** Rückmeldung zu einem eigenen Vorschlag, der inzwischen geprüft wurde */
+export type NotificationKind = 'friend_request' | 'friend_accepted' | 'pub_approved' | 'pub_rejected' | 'friend_checkin' | 'review';
+/** Mitteilung in der App (dieselben Ereignisse kommen als Push) */
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  data: { user_id?: string; username?: string; pub_id?: string | null; pub_name?: string; edit_id?: string; edit_kind?: string };
+  at: string;
+  read: boolean;
+}
+/** Welche Mitteilungen jemand bekommen möchte (pub_approved gilt auch für abgelehnte Vorschläge) */
+export type NotifyPrefKey = 'friend_request' | 'friend_accepted' | 'pub_approved' | 'friend_checkin' | 'review';
+export type NotifyPrefs = Record<NotifyPrefKey, boolean>;
+export const NOTIFY_DEFAULTS: NotifyPrefs = { friend_request: true, friend_accepted: true, pub_approved: true, friend_checkin: false, review: true };
+
 export interface FriendAtPub {
   user: PublicProfile;
   visits: number;
@@ -269,6 +283,18 @@ export interface Api {
   respondFriendRequest(userId: string, accept: boolean): Promise<void>;
   removeFriend(userId: string): Promise<void>;
   friendRequests(): Promise<FriendRequest[]>;
+
+  // Mitteilungen
+  notifications(): Promise<AppNotification[]>;
+  markNotificationsRead(): Promise<void>;
+  notifyPrefs(): Promise<NotifyPrefs>;
+  setNotifyPrefs(prefs: NotifyPrefs): Promise<void>;
+  /** öffentlicher Schlüssel für Web Push; null im Demo-Modus */
+  pushKey(): Promise<string | null>;
+  savePushSubscription(sub: PushSubscriptionJSON, lang: string): Promise<void>;
+  removePushSubscription(endpoint: string): Promise<void>;
+  /** anstehende Push-Mitteilungen verschicken lassen (läuft im Hintergrund) */
+  flushPush(): void;
   friends(): Promise<PublicProfile[]>;
   /** Freunde, die schon in dieser Kneipe eingecheckt haben (meiste Check-ins zuerst) */
   friendsAtPub(pubId: string): Promise<FriendAtPub[]>;

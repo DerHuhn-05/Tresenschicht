@@ -21,7 +21,9 @@ export type Route =
   | { kind: 'blocked' }
   | { kind: 'datenschutz' }
   | { kind: 'locationHelp' }
-  | { kind: 'help' };
+  | { kind: 'help' }
+  | { kind: 'notifications' }
+  | { kind: 'notifySettings' };
 
 export type LocStatus = 'off' | 'asking' | 'ok' | 'denied' | 'unavailable';
 

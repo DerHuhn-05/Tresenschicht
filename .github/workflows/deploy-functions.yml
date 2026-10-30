@@ -1,7 +1,7 @@
-# Veröffentlicht die Supabase Edge Function „pub-review“ (Vorschläge per E-Mail prüfen).
-# Secrets: SUPABASE_ACCESS_TOKEN (Supabase → Account → Access Tokens), VITE_SUPABASE_URL (schon vorhanden),
-#          RESEND_API_KEY (resend.com → API Keys), optional MAIL_FROM (Absender mit eigener Domain)
-name: Supabase-Funktion veröffentlichen
+# Veröffentlicht die Supabase Edge Functions „push“ (Mitteilungen) und „pub-review“ (Vorschläge per E-Mail prüfen).
+# Secrets: SUPABASE_ACCESS_TOKEN (Pflicht; Supabase → Account → Access Tokens), VITE_SUPABASE_URL (schon vorhanden),
+#          RESEND_API_KEY (nur für die Prüf-Mails; resend.com → API Keys), optional MAIL_FROM (Absender mit eigener Domain)
+name: Supabase-Funktionen veröffentlichen
 on:
   push:
     branches: [main]
@@ -28,11 +28,14 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
         run: |
-          args=("RESEND_API_KEY=$RESEND_API_KEY" "ADMIN_EMAIL=tresenschicht@gmx.net" "APP_URL=https://derhuhn-05.github.io/Tresenschicht/")
+          args=("ADMIN_EMAIL=tresenschicht@gmx.net" "APP_URL=https://derhuhn-05.github.io/Tresenschicht/")
+          if [ -n "$RESEND_API_KEY" ]; then args+=("RESEND_API_KEY=$RESEND_API_KEY"); fi
           if [ -n "$MAIL_FROM" ]; then args+=("MAIL_FROM=$MAIL_FROM"); fi
           supabase secrets set "${args[@]}" --project-ref "${{ steps.ref.outputs.ref }}"
-      - name: Funktion veröffentlichen
+      - name: Funktionen veröffentlichen
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        # ohne JWT-Prüfung: die Prüfseite aus der E-Mail ist nicht angemeldet; die Funktion prüft selbst
-        run: supabase functions deploy pub-review --project-ref "${{ steps.ref.outputs.ref }}" --no-verify-jwt
+        # ohne JWT-Prüfung: die Prüfseite aus der E-Mail ist nicht angemeldet; die Funktionen prüfen selbst
+        run: |
+          supabase functions deploy push --project-ref "${{ steps.ref.outputs.ref }}" --no-verify-jwt
+          supabase functions deploy pub-review --project-ref "${{ steps.ref.outputs.ref }}" --no-verify-jwt

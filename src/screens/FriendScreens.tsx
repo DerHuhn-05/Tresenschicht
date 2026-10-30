@@ -18,11 +18,13 @@ export function FriendsScreen() {
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<PublicProfile[] | null>(null);
   const [feed, setFeed] = useState<FeedItem[] | null>(null);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     api.friendRequests().then(setRequests).catch(() => {});
     api.friends().then(setFriends).catch(() => setFriends([]));
     api.feed().then(setFeed).catch(() => setFeed([]));
+    api.notifications().then((l) => setUnread(l.filter((n) => !n.read).length)).catch(() => {});
   }, [app.version]);
 
   useEffect(() => {
@@ -39,7 +41,13 @@ export function FriendsScreen() {
 
   return (
     <div className="screen">
-      <h1 className="t-display page-title">{t('Freunde')}</h1>
+      <div className="row-between page-title">
+        <h1 className="t-display">{t('Freunde')}</h1>
+        <button className="icon-btn bell-btn" onClick={() => app.push({ kind: 'notifications' })} aria-label={unread ? t('Mitteilungen, {n} neu', { n: unread }) : t('Mitteilungen')}>
+          <Icon name="bell" />
+          {unread > 0 && <span className="badge">{unread}</span>}
+        </button>
+      </div>
       <div className="input-icon">
         <Icon name="search" />
         <input className="input" type="search" placeholder={t('Benutzername suchen')} aria-label={t('Freunde nach Benutzername suchen')} value={q} onChange={(e) => setQ(e.target.value)} autoCapitalize="none" autoCorrect="off" />

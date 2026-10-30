@@ -187,6 +187,8 @@ Deno.serve(async (req) => {
       const accept = !!body.accept;
       const { error } = await db.rpc('review_edit', { p_id: id, p_accept: accept });
       if (error) throw error;
+      // Push an die Person, die vorgeschlagen hat (Mitteilung legt die Datenbank an)
+      fetch(`${SUPABASE_URL}/functions/v1/push`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"action":"flush"}' }).catch(() => {});
       try {
         await notifyProposer(e, accept);
       } catch (err) {

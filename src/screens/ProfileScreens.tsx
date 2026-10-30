@@ -117,6 +117,7 @@ export function ProfileScreen() {
         <h2 className="t-h3 section-title">{t('Konto')}</h2>
         <ul className="list">
           <Row icon="edit" title={t('Profil bearbeiten')} sub={t('Name, Benutzername, Stadt, Profilbild')} onClick={() => app.push({ kind: 'editProfile' })} />
+          <Row icon="bell" title={t('Mitteilungen')} sub={t('Push und was du mitbekommst')} onClick={() => app.push({ kind: 'notifySettings' })} />
           <Row icon="feed" title={t('Sprache')} sub={LANG === 'de' ? 'Deutsch' : 'English'} onClick={() => setLangSheet(true)} />
           <Row icon="location" title={t('Standort')} sub={locText} onClick={() => app.push({ kind: 'locationHelp' })} />
           <Row icon="lock" title={t('Privatsphäre und Datenschutz')} sub={t('Dein Profil ist privat')} onClick={() => app.push({ kind: 'privacy' })} />

@@ -239,7 +239,7 @@ function Reset({ onBack, onDone }: { onBack: () => void; onDone: (u: User) => vo
         >
           <Icon name="mail" size={32} />
           <h1 className="t-h2" style={{ marginTop: 12 }}>{t('Code eingeben')}</h1>
-          <p style={{ margin: '8px 0 20px' }}>{t('Gibt es ein Konto zu {email}, bekommst du gleich eine E-Mail mit einem Code. Gib ihn hier ein und wähle ein neues Passwort.', { email })}</p>
+          <p style={{ margin: '8px 0 20px' }}>{t('Gibt es ein Konto zu {email}, bekommst du gleich eine E-Mail. Steht darin ein Code, gib ihn hier ein und wähle ein neues Passwort. Steht darin nur ein Link: Tipp ihn an, dann kannst du dort ein neues Passwort wählen.', { email })}</p>
           <CodeField value={code} onChange={setCode} />
           <Field label={t('Neues Passwort')} hint={t('Mindestens 8 Zeichen.')}>
             {(id, d) => <input id={id} aria-describedby={d} className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />}
@@ -400,6 +400,44 @@ export function LocationOnboarding({ onAllow, onLater }: { onAllow: () => void; 
       <div className="btn-stack">
         <button className="btn btn-primary btn-block" onClick={onAllow}>{t('Standort erlauben')}</button>
         <button className="btn btn-text btn-block" onClick={onLater}>{t('Später')}</button>
+      </div>
+    </div>
+  );
+}
+
+/** Nach dem Link aus der Mail „Passwort zurücksetzen“: angemeldet, jetzt ein neues Passwort wählen. */
+export function SetNewPassword({ onDone }: { onDone: (u: User) => void }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="page" role="dialog" aria-modal="true" aria-label={t('Neues Passwort')} style={{ zIndex: 60 }}>
+      <div className="screen">
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setError(null);
+            try {
+              onDone(await api.setNewPassword(password));
+            } catch (err) {
+              setError((err as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <Icon name="lock" size={32} />
+          <h1 className="t-h2" style={{ marginTop: 12 }}>{t('Neues Passwort wählen')}</h1>
+          <p style={{ margin: '8px 0 20px' }}>{t('Du kommst über den Link aus der Mail. Wähle jetzt ein neues Passwort.')}</p>
+          <Field label={t('Neues Passwort')} hint={t('Mindestens 8 Zeichen.')}>
+            {(id, d) => <input id={id} aria-describedby={d} className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus />}
+          </Field>
+          {error && <div style={{ marginTop: 16 }}><Notice icon="error">{error}</Notice></div>}
+          <button className="btn btn-primary btn-block" style={{ marginTop: 24 }} disabled={busy || password.length < 8}>
+            {busy ? t('Wird gespeichert …') : t('Passwort speichern')}
+          </button>
+        </form>
       </div>
     </div>
   );

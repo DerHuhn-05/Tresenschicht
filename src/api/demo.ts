@@ -186,6 +186,13 @@ export class DemoApi implements Api {
     await this.wait(null);
   }
 
+  async setNewPassword(password: string) {
+    const me = this.me();
+    me.password = password;
+    this.commit();
+    return this.publicUser(me);
+  }
+
   // Im Demo-Modus gibt es keine E-Mails; jeder sechsstellige Code gilt.
   async verifyEmailCode() {
     return this.publicUser(this.me());

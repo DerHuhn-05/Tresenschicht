@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { api } from './api';
 import { Icon, type IconName } from './components/Icon';
 import { Toast } from './components/ui';
-import { AuthFlow, LocationOnboarding } from './screens/AuthScreens';
+import { AuthFlow, LocationOnboarding, SetNewPassword } from './screens/AuthScreens';
 import { CheckInFlow } from './screens/CheckInFlow';
 import { CollectionScreen, DetailsScreen, VisitsScreen } from './screens/CollectionScreens';
 import { FriendsScreen, UserProfile } from './screens/FriendScreens';
@@ -47,6 +47,8 @@ export function App() {
   // A4: Standort-Erklärung beim Öffnen, bis einmal gefragt wurde; „Später“ gilt nur für diese Sitzung
   const [onboarding, setOnboarding] = useState(() => !load(LOCATION_ASKED, false));
   const [requests, setRequests] = useState(0);
+  // über den Link „Passwort zurücksetzen“ gekommen (siehe index.html)
+  const [recovery, setRecovery] = useState(() => !!(window as Window & { __tresenRecovery?: boolean }).__tresenRecovery);
 
   useEffect(() => {
     if (!app.user) return;
@@ -124,6 +126,15 @@ export function App() {
   return (
     <div className="app">
       {body}
+      {recovery && app.user && (
+        <SetNewPassword
+          onDone={(u) => {
+            app.setUser(u);
+            setRecovery(false);
+            app.notify(t('Dein neues Passwort ist gespeichert.'), 'success');
+          }}
+        />
+      )}
       {app.toast && <Toast key={app.toast.id} text={app.toast.text} kind={app.toast.kind} onDone={app.clearToast} />}
     </div>
   );

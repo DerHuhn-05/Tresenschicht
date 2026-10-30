@@ -488,4 +488,9 @@ export const EN: Record<string, string> = {
   "Ich habe bestätigt, weiter": "I've confirmed, continue",
   "Ich habe bestätigt, zur Anmeldung": "I've confirmed, go to login",
   "Keine Mail? Schau im Spam-Ordner nach.": "No email? Check your spam folder.",
+  "Für diese E-Mail gibt es schon ein Konto. Melde dich an oder setze dein Passwort zurück.": "There is already an account for this email. Log in or reset your password.",
+  "Neues Passwort wählen": "Choose a new password",
+  "Du kommst über den Link aus der Mail. Wähle jetzt ein neues Passwort.": "You've come via the link in the email. Choose a new password now.",
+  "Dein neues Passwort ist gespeichert.": "Your new password has been saved.",
+  "Gibt es ein Konto zu {email}, bekommst du gleich eine E-Mail. Steht darin ein Code, gib ihn hier ein und wähle ein neues Passwort. Steht darin nur ein Link: Tipp ihn an, dann kannst du dort ein neues Passwort wählen.": "If there is an account for {email}, you'll get an email shortly. If it contains a code, enter it here and choose a new password. If it only contains a link: tap it and choose a new password there.",
 };

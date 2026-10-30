@@ -102,6 +102,10 @@ export class SupabaseApi implements Api {
       },
     });
     const data = must(res);
+    // Adresse schon registriert: Supabase meldet Erfolg, verschickt aber keine Mail (Datenschutz)
+    if (data.user && !data.session && data.user.identities?.length === 0) {
+      throw new Error(t('Für diese E-Mail gibt es schon ein Konto. Melde dich an oder setze dein Passwort zurück.'));
+    }
     if (data.session && data.user) {
       await this.loadProfile(data.user.id, d.email);
       if (d.avatar) await this.uploadAvatar(d.avatar);
@@ -137,7 +141,17 @@ export class SupabaseApi implements Api {
 
   async signIn(email: string, password: string) {
     const data = must(await this.sb.auth.signInWithPassword({ email, password }));
+    // Profilbild aus der Registrierung nachreichen (Bestätigung per Link statt Code)
+    if (this.pendingAvatar) {
+      await this.uploadAvatar(this.pendingAvatar).catch(() => {});
+      this.pendingAvatar = null;
+    }
     return this.loadProfile(data.user.id, data.user.email ?? email);
+  }
+
+  async setNewPassword(password: string) {
+    const data = must(await this.sb.auth.updateUser({ password }));
+    return this.loadProfile(data.user.id, data.user.email ?? '');
   }
 
   async signOut() {

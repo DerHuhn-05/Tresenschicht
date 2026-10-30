@@ -223,6 +223,8 @@ export interface Api {
   verifyEmailCode(email: string, code: string): Promise<User>;
   resendEmailCode(email: string): Promise<void>;
   resetPasswordWithCode(email: string, code: string, password: string): Promise<User>;
+  /** Neues Passwort setzen, wenn man über den Link aus der Mail angemeldet ist */
+  setNewPassword(password: string): Promise<User>;
   deleteAccount(): Promise<void>;
   isUsernameFree(username: string): Promise<boolean>;
   updateProfile(patch: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'username'>> & { avatar?: Blob }): Promise<User>;

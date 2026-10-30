@@ -120,7 +120,12 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
     giveUp.current = null;
   }, []);
 
-  const startWatch = useCallback(() => {
+  /** Home-Bildschirm-App (iOS): hat eigene Freigaben, getrennt von Safari */
+  const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches;
+
+  // gesture: vom Antippen ausgelöst. iOS lehnt in der Home-Bildschirm-App Abfragen ohne Antippen oft still ab;
+  // eine solche Ablehnung gilt nicht als endgültig, die App bittet dann ums Antippen.
+  const startWatch = useCallback((gesture = false) => {
     if (!('geolocation' in navigator)) {
       setLocation((l) => ({ ...l, status: 'unavailable', error: 'Kein Standortdienst im Browser' }));
       return;
@@ -140,7 +145,10 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
     const fail = (err: GeolocationPositionError) =>
       setLocation((l) => {
         const error = `${err.code}: ${err.message || 'ohne Text'}`;
-        if (err.code === err.PERMISSION_DENIED) return { ...l, status: 'denied', error };
+        if (err.code === err.PERMISSION_DENIED) {
+          if (standalone && !gesture) return { ...l, status: 'off', error };
+          return { ...l, status: 'denied', error };
+        }
         // Kein Signal oder Zeit abgelaufen: Die Abfrage läuft weiter, ein Standort kann noch kommen.
         // iOS meldet drinnen oft erst „nicht verfügbar“ und liefert Sekunden später doch einen Standort.
         return l.status === 'ok' ? { ...l, error } : { ...l, status: 'asking', error };
@@ -150,14 +158,14 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
     watchId.current = navigator.geolocation.watchPosition(ok(false), fail, { enableHighAccuracy: true, maximumAge: 10_000, timeout: 30_000 });
     // Nach 45 Sekunden ohne Standort einen Hinweis zeigen; die Abfrage läuft trotzdem weiter
     giveUp.current = setTimeout(() => setLocation((l) => (l.status === 'asking' ? { ...l, status: 'unavailable' } : l)), 45_000);
-  }, [stopWatch]);
+  }, [stopWatch, standalone]);
 
   const requestLocation = useCallback(() => {
     if (location.simulated) {
       setLocation((l) => ({ ...l, fix: l.fix + 1 }));
       return;
     }
-    startWatch();
+    startWatch(true);
   }, [location.simulated, startWatch]);
 
   const simulate = useCallback((pos: LatLon) => {
@@ -170,7 +178,7 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
       save('kneipen-demo-simulate', !on);
       if (on) {
         setLocation((l) => ({ ...l, simulated: false, status: 'off' }));
-        startWatch();
+        startWatch(true);
       } else {
         stopWatch();
         setLocation((l) => ({ status: 'ok', simulated: true, pos: load('kneipen-demo-pos', DEMO_START), accuracy: 15, fix: l.fix + 1 }));

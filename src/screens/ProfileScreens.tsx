@@ -341,6 +341,9 @@ export function LocationHelp() {
             {t('Dein iPhone fragt gleich, ob Tresenschicht deinen Standort verwenden darf. Wähle „Erlauben“. Auf dem iPhone fragt eine Web-App bei jedem Öffnen neu, das ist eine Vorgabe von iOS.')}
           </p>
         )}
+        {app.location.error && s !== 'ok' && (
+          <p className="t-caption muted">{t('Meldung des Geräts')}: {app.location.error}</p>
+        )}
         <button
           className="btn btn-primary btn-block"
           style={{ marginTop: 24 }}

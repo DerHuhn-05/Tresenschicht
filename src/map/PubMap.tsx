@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import Supercluster from 'supercluster';
 import type { Bounds, CountryTotal, Pub, PubCell, PubTile } from '../api';
 import type { LatLon } from '../lib/geo';
-import { tokenColor } from '../lib/theme';
+import { tokenColor, useTheme, type Theme } from '../lib/theme';
 import { COUNTRY_ZOOM, DETAIL_ZOOM, PIN_ZOOM, tilesFor } from '../lib/tiles';
 import { brandStyle, fallbackStyle } from './style';
 import { LOCALE, t } from '../lib/i18n';
@@ -103,13 +103,17 @@ const GLYPH_PATHS = [
   'M5 12.5v7h14v-7',
   'M10 19.5v-3.5a2 2 0 0 1 4 0v3.5',
 ];
-/** Noch nicht besucht: gedämpftes Blaugrau, damit besuchte Kneipen (Bernstein) herausstechen */
-const OPEN = tokenColor('navy-300', 'dark');
-const EDGE = tokenColor('navy-950', 'dark');
+/** Noch nicht besucht: gedämpftes Blaugrau, damit besuchte Kneipen (Bernstein) herausstechen.
+ *  Auf der hellen Karte etwas kräftiger und mit weißem Rand. */
+const pinColors = (theme: Theme) =>
+  theme === 'dark'
+    ? { open: tokenColor('navy-300', 'dark'), edge: tokenColor('navy-950', 'dark') }
+    : { open: tokenColor('navy-400', 'dark'), edge: tokenColor('white', 'dark') };
 
 /** Pin-Form aus dem Design System. Besucht: Bernstein (gelb), noch nicht besucht: Blaugrau.
  *  Dunkler Rand, damit sich überlappende Pins trennen lassen. */
-function pinImage(done: boolean) {
+function pinImage(done: boolean, theme: Theme) {
+  const { open, edge } = pinColors(theme);
   const w = 44;
   const h = 52;
   const cv = document.createElement('canvas');
@@ -119,9 +123,9 @@ function pinImage(done: boolean) {
   g.scale(RATIO, RATIO);
   g.translate(1, 3);
   const pin = new Path2D(PIN_PATH);
-  g.fillStyle = done ? MARKER : OPEN;
+  g.fillStyle = done ? MARKER : open;
   g.fill(pin);
-  g.strokeStyle = EDGE;
+  g.strokeStyle = edge;
   g.lineWidth = 1.5;
   g.stroke(pin);
   g.save();
@@ -160,6 +164,9 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
   const nameTag = useRef<maplibregl.Marker | null>(null);
   const [offline, setOffline] = useState(false);
   const touchedRef = useRef(false);
+  // Hell/Dunkel folgt dem iPhone; beim Umschalten bekommt die Karte den passenden Skin
+  const theme = useTheme();
+  const themeRef = useRef(theme);
   const offlineRef = useRef(false);
   const tiled = !!loadTile;
 
@@ -331,8 +338,8 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
 
   function addLayers(m: MlMap) {
     if (!m.hasImage('pin')) {
-      m.addImage('pin', pinImage(false), { pixelRatio: RATIO });
-      m.addImage('pin-done', pinImage(true), { pixelRatio: RATIO });
+      m.addImage('pin', pinImage(false, themeRef.current), { pixelRatio: RATIO });
+      m.addImage('pin-done', pinImage(true, themeRef.current), { pixelRatio: RATIO });
     }
     if (m.getSource('pubs')) return;
     m.addSource('cells', { type: 'geojson', data: EMPTY });
@@ -354,10 +361,12 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     } as const;
     const clusterLayout = { 'icon-allow-overlap': true, 'icon-ignore-placement': true } as const;
     const detailMin = tiled ? PIN_ZOOM : 0;
+    const dark = themeRef.current === 'dark';
     const layers: LayerSpecification[] = [
       // eigener Standort zuerst, also unter allen Kneipen
-      { id: 'me-halo', type: 'circle', source: 'me', paint: { 'circle-radius': 11, 'circle-color': '#FFFFFF', 'circle-opacity': 0.18 } },
-      { id: 'me-dot', type: 'circle', source: 'me', paint: { 'circle-radius': 6, 'circle-color': '#FFFFFF', 'circle-stroke-width': 3, 'circle-stroke-color': tokenColor('navy-700', 'dark') } },
+      // eigener Standort: dunkel ein weißer Punkt, hell ein Nachtblau-Punkt mit weißem Rand
+      { id: 'me-halo', type: 'circle', source: 'me', paint: { 'circle-radius': 11, 'circle-color': dark ? '#FFFFFF' : tokenColor('navy-700', 'dark'), 'circle-opacity': dark ? 0.18 : 0.15 } },
+      { id: 'me-dot', type: 'circle', source: 'me', paint: { 'circle-radius': 6, 'circle-color': dark ? '#FFFFFF' : tokenColor('navy-700', 'dark'), 'circle-stroke-width': 3, 'circle-stroke-color': dark ? tokenColor('navy-700', 'dark') : '#FFFFFF' } },
       { id: 'cells-cluster', type: 'symbol', source: 'cells', maxzoom: PIN_ZOOM, filter: ['==', ['get', 'kind'], 'cell'], layout: { ...clusterLayout, 'icon-image': ['get', 'img'] } },
       { id: 'cells-pin', type: 'symbol', source: 'cells', maxzoom: PIN_ZOOM, filter: ['==', ['get', 'kind'], 'pub'], layout: pinLayout as any },
       {
@@ -382,7 +391,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     const start = initialCenter ?? props.current.userPos ?? { lat: 51.16, lon: 10.45 };
     const m = new maplibregl.Map({
       container: box.current!,
-      style: brandStyle(),
+      style: brandStyle(themeRef.current),
       center: [start.lon, start.lat],
       zoom: initialCenter || props.current.userPos ? initialZoom : 5,
       attributionControl: false,
@@ -400,7 +409,7 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
       if (tilesOk || !map.current || offlineRef.current) return;
       offlineRef.current = true;
       setOffline(true);
-      m.setStyle(fallbackStyle(), { diff: false });
+      m.setStyle(fallbackStyle(themeRef.current), { diff: false });
     };
     const failTimer = setTimeout(goOffline, 7000);
     m.on('sourcedata', (e) => {
@@ -466,6 +475,15 @@ export const PubMap = forwardRef<PubMapHandle, Props>(function PubMap(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (themeRef.current === theme) return;
+    themeRef.current = theme;
+    const m = map.current;
+    if (!m) return;
+    // neuer Stil: Quellen, Ebenen und Pin-Bilder kommen über 'style.load' wieder dazu
+    m.setStyle(offlineRef.current ? fallbackStyle(theme) : brandStyle(theme), { diff: false });
+  }, [theme]);
 
   // Feste Liste geändert oder gesammelte Kneipen geändert: neu zeichnen
   useEffect(() => {

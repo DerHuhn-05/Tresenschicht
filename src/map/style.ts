@@ -1,5 +1,5 @@
 import type { ExpressionSpecification, StyleSpecification } from 'maplibre-gl';
-import { tokenColor } from '../lib/theme';
+import { tokenColor, type Theme } from '../lib/theme';
 
 const TILES = (import.meta.env.VITE_TILES_URL as string) || 'https://tiles.openfreemap.org/planet';
 const GLYPHS = (import.meta.env.VITE_GLYPHS_URL as string) || 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
@@ -7,26 +7,43 @@ const GLYPHS = (import.meta.env.VITE_GLYPHS_URL as string) || 'https://tiles.ope
 const c = (n: string) => tokenColor(n, 'dark');
 
 /**
- * C6: Kartenskin in den Markenfarben, immer im Nachtblau der App (unabhängig vom Hell-/Dunkelmodus).
- * Nur Nachtblau und die bläulichen Grautöne des Design Systems: Wasser am dunkelsten, Land Nachtblau,
- * Grünflächen und Gebäude eine Spur heller, Straßen in Grau. Bernstein bleibt den Kneipen-Pins vorbehalten.
- * Keine Verläufe, keine Schatten, kaum Beschriftung. Schema: OpenMapTiles.
+ * C6: Kartenskin in den Markenfarben, schlicht: nur Nachtblau und die bläulichen Grautöne des Design Systems,
+ * Bernstein bleibt den Kneipen-Pins vorbehalten. Keine Verläufe, keine Schatten, kaum Beschriftung.
+ * Dunkel: Wasser am dunkelsten, Land Nachtblau, Straßen in Grau. Hell: fast Weiß mit Nachtblau-Tönen.
+ * Schema: OpenMapTiles.
  */
-export const MAP_COLORS = {
-  land: c('navy-900'), // #000035
-  water: c('navy-950'), // #00001F
-  green: c('navy-800'), // #0D0F4A
-  building: c('gray-900'), // #1B1C2A
-  minor: c('navy-700'), // #1F2260
-  major: c('gray-700'), // #454658
-  motorway: c('gray-600'), // #5E5F73
-  label: c('gray-400'), // #9899AB
+const DARK = {
+  land: c('navy-900'),
+  water: c('navy-950'),
+  green: c('navy-800'),
+  building: c('gray-900'),
+  minor: c('navy-700'),
+  major: c('gray-700'),
+  motorway: c('gray-600'),
+  label: c('gray-400'),
   halo: c('navy-900'),
   border: c('gray-500'),
 };
+const LIGHT = {
+  land: c('gray-50'),
+  water: c('navy-200'),
+  green: c('navy-100'),
+  building: c('gray-100'),
+  minor: c('white'),
+  major: c('navy-200'),
+  motorway: c('navy-300'),
+  label: c('gray-600'),
+  halo: c('gray-50'),
+  border: c('navy-400'),
+};
+const CONTRAST = { ...LIGHT, land: c('white'), minor: c('gray-200'), major: c('navy-400'), motorway: c('navy-500'), label: c('navy-900'), halo: c('white'), building: c('gray-200') };
 
-export function brandStyle(): StyleSpecification {
-  const m = MAP_COLORS;
+export function mapColors(theme: Theme) {
+  return theme === 'dark' ? DARK : theme === 'contrast' ? CONTRAST : LIGHT;
+}
+
+export function brandStyle(theme: Theme = 'dark'): StyleSpecification {
+  const m = mapColors(theme);
   const font = ['Noto Sans Regular'];
   const width = (base: number): ExpressionSpecification => ['interpolate', ['exponential', 1.5], ['zoom'], 10, base * 0.4, 14, base * 1.6, 18, base * 9];
   const cls = (...v: string[]): ExpressionSpecification => ['in', ['get', 'class'], ['literal', v]];
@@ -84,7 +101,7 @@ export function brandStyle(): StyleSpecification {
   };
 }
 
-/** Ersatz, wenn keine Kacheln geladen werden können: Nachtblau, Pins bleiben nutzbar. */
-export function fallbackStyle(): StyleSpecification {
-  return { version: 8, sources: {}, layers: [{ id: 'land', type: 'background', paint: { 'background-color': MAP_COLORS.land } }] };
+/** Ersatz, wenn keine Kacheln geladen werden können: einfarbiges Land, Pins bleiben nutzbar. */
+export function fallbackStyle(theme: Theme = 'dark'): StyleSpecification {
+  return { version: 8, sources: {}, layers: [{ id: 'land', type: 'background', paint: { 'background-color': mapColors(theme).land } }] };
 }

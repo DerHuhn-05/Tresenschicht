@@ -44,11 +44,19 @@ export function MapScreen() {
 
   const sortedList = useMemo(() => (list ?? []).map((p) => ({ p, d: p.distance })), [list]);
 
+  // Standort-Knopf: ist noch kein Standort da, fliegt die Karte hin, sobald er ankommt
+  const wantLocate = useRef(false);
   function locate() {
     if (location.status === 'denied') return app.push({ kind: 'locationHelp' });
     app.requestLocation();
-    if (location.pos) mapRef.current?.flyTo(location.pos, 16);
+    if (location.pos) mapRef.current?.flyTo(location.pos, zoomForRadius(location.pos.lat, START_RADIUS_M));
+    else wantLocate.current = true;
   }
+  useEffect(() => {
+    if (!wantLocate.current || !location.pos || !mapRef.current) return;
+    wantLocate.current = false;
+    mapRef.current.flyTo(location.pos, zoomForRadius(location.pos.lat, START_RADIUS_M));
+  }, [location.fix, location.pos]);
 
   // Start: dein Standort mit etwa 300 m Umkreis. Ohne Standort bleibt die Übersicht; hast du die Karte
   // schon selbst bewegt, springt sie nicht mehr.
@@ -153,7 +161,15 @@ export function MapScreen() {
           </Notice>
         )}
         {hint === 'area' && !hidden.has('area') && <Notice onClose={hide('area')}>{t('Check-ins gehen nur in Deutschland, seinen Nachbarländern, Italien und Spanien. Die Karte kannst du überall ansehen.')}</Notice>}
-        {(location.status === 'denied' || location.status === 'unavailable') && !location.simulated && !hidden.has('denied') && (
+        {location.status === 'unavailable' && !location.simulated && !hidden.has('unavailable') && (
+          <Notice icon="location-off" onClose={hide('unavailable')}>
+            {t('Dein iPhone findet gerade keinen Standort. Geh kurz ans Fenster oder vor die Tür.')}{' '}
+            <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.requestLocation()}>
+              {t('Noch einmal versuchen')}
+            </button>
+          </Notice>
+        )}
+        {location.status === 'denied' && !location.simulated && !hidden.has('denied') && (
           <Notice icon="location-off" onClose={hide('denied')}>
             {t('Kein Standort. Öffne die Einstellungen und erlaube den Zugriff, während die App geöffnet ist.')}{' '}
             <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.push({ kind: 'locationHelp' })}>

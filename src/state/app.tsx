@@ -32,6 +32,8 @@ export interface LocationState {
   simulated: boolean;
   /** Steigt bei jedem neuen Standort, damit die Check-in-Prüfung neu läuft. */
   fix: number;
+  /** Letzte Fehlermeldung des Geräts (für die Hilfe-Seite) */
+  error?: string;
 }
 
 interface Toast {
@@ -110,33 +112,44 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
   }, []);
 
   // H1: Standort nur, solange die App offen ist. Beim Wechsel in den Hintergrund wird die Abfrage beendet.
+  const giveUp = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopWatch = useCallback(() => {
     if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
     watchId.current = null;
+    if (giveUp.current) clearTimeout(giveUp.current);
+    giveUp.current = null;
   }, []);
 
   const startWatch = useCallback(() => {
     if (!('geolocation' in navigator)) {
-      setLocation((l) => ({ ...l, status: 'unavailable' }));
+      setLocation((l) => ({ ...l, status: 'unavailable', error: 'Kein Standortdienst im Browser' }));
       return;
     }
     stopWatch();
     save(LOCATION_ASKED, true);
     setLocation((l) => (l.status === 'ok' ? l : { ...l, status: 'asking' }));
-    watchId.current = navigator.geolocation.watchPosition(
-      (p) => {
-        save('kneipen-location-granted', true);
-        setLocation((l) => ({ status: 'ok', simulated: false, pos: { lat: p.coords.latitude, lon: p.coords.longitude }, accuracy: p.coords.accuracy, fix: l.fix + 1 }));
-      },
-      (err) =>
-        setLocation((l) => {
-          if (err.code === err.PERMISSION_DENIED) return { ...l, status: 'denied' };
-          // Zeitüberschreitung: die Abfrage läuft weiter, ein Standort kann noch kommen
-          if (err.code === err.TIMEOUT) return l.status === 'ok' ? l : { ...l, status: 'asking' };
-          return { ...l, status: 'unavailable' };
-        }),
-      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 }
-    );
+    const ok = (coarse: boolean) => (p: GeolocationPosition) => {
+      save('kneipen-location-granted', true);
+      setLocation((l) =>
+        // ein grober Standort ersetzt nie einen genauen
+        coarse && l.status === 'ok' && !l.simulated && (l.accuracy ?? Infinity) <= p.coords.accuracy
+          ? l
+          : { status: 'ok', simulated: false, pos: { lat: p.coords.latitude, lon: p.coords.longitude }, accuracy: p.coords.accuracy, fix: l.fix + 1 }
+      );
+    };
+    const fail = (err: GeolocationPositionError) =>
+      setLocation((l) => {
+        const error = `${err.code}: ${err.message || 'ohne Text'}`;
+        if (err.code === err.PERMISSION_DENIED) return { ...l, status: 'denied', error };
+        // Kein Signal oder Zeit abgelaufen: Die Abfrage läuft weiter, ein Standort kann noch kommen.
+        // iOS meldet drinnen oft erst „nicht verfügbar“ und liefert Sekunden später doch einen Standort.
+        return l.status === 'ok' ? { ...l, error } : { ...l, status: 'asking', error };
+      });
+    // Erst schnell ein grober Standort (WLAN, Mobilfunk), dann genau per GPS
+    navigator.geolocation.getCurrentPosition(ok(true), fail, { enableHighAccuracy: false, maximumAge: 120_000, timeout: 15_000 });
+    watchId.current = navigator.geolocation.watchPosition(ok(false), fail, { enableHighAccuracy: true, maximumAge: 10_000, timeout: 30_000 });
+    // Nach 45 Sekunden ohne Standort einen Hinweis zeigen; die Abfrage läuft trotzdem weiter
+    giveUp.current = setTimeout(() => setLocation((l) => (l.status === 'asking' ? { ...l, status: 'unavailable' } : l)), 45_000);
   }, [stopWatch]);
 
   const requestLocation = useCallback(() => {
@@ -170,10 +183,22 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
     if (!user || location.simulated) return;
     // iOS fragt in Web-Apps pro Sitzung neu: Wer das Onboarding hinter sich hat, bekommt die Abfrage bei jedem Öffnen.
     if (load(LOCATION_ASKED, false)) startWatch();
+    // Schon in Safari erlaubt (z. B. über die Einstellungen)? Dann ohne weitere Nachfrage starten.
+    let perm: PermissionStatus | null = null;
+    const onPerm = () => perm?.state === 'granted' && startWatch();
+    navigator.permissions
+      ?.query({ name: 'geolocation' })
+      .then((p) => {
+        perm = p;
+        if (p.state === 'granted' && !load(LOCATION_ASKED, false)) startWatch();
+        p.addEventListener?.('change', onPerm);
+      })
+      .catch(() => {});
     const onVis = () => (document.hidden ? stopWatch() : load(LOCATION_ASKED, false) && startWatch());
     document.addEventListener('visibilitychange', onVis);
     return () => {
       document.removeEventListener('visibilitychange', onVis);
+      perm?.removeEventListener?.('change', onPerm);
       stopWatch();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

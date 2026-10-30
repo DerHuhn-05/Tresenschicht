@@ -597,6 +597,31 @@ textarea.input {
   letter-spacing: -0.88px;
 }
 
+/* Glas-Elemente auf der Karte und Menüleiste: hell milchig, dunkel Nachtblau */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(0, 0, 53, 0.1);
+  --glass-text: var(--navy-900);
+  --tab-indicator: rgba(0, 0, 53, 0.08);
+  --map-bg: var(--navy-50);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='contrast']) {
+    --glass-bg: rgba(0, 0, 53, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --glass-text: var(--white);
+    --tab-indicator: rgba(255, 255, 255, 0.12);
+    --map-bg: var(--navy-900);
+  }
+}
+:root[data-theme='dark'] {
+  --glass-bg: rgba(0, 0, 53, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-text: var(--white);
+  --tab-indicator: rgba(255, 255, 255, 0.12);
+  --map-bg: var(--navy-900);
+}
+
 /* Tab-Leiste */
 :root {
   /* Abstand der schwebenden Menüleiste vom unteren Rand und ihre Höhe */
@@ -616,10 +641,10 @@ textarea.input {
   padding: 6px;
   border-radius: var(--radius-full);
   /* Glas wie bei iOS: halbdurchsichtiges Nachtblau mit Unschärfe dahinter */
-  background: rgba(0, 0, 53, 0.55);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(24px) saturate(170%);
   backdrop-filter: blur(24px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--glass-border);
   z-index: 20;
 }
 :root[data-theme='contrast'] .tabbar {
@@ -666,7 +691,7 @@ textarea.input {
   left: 6px;
   width: calc((100% - 12px - 3 * var(--space-1)) / 4);
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--tab-indicator);
   transform: translateX(calc(var(--i, 0) * (100% + var(--space-1))));
   transition: transform 420ms cubic-bezier(0.32, 1.25, 0.45, 1);
   pointer-events: none;
@@ -869,7 +894,7 @@ textarea.input {
   position: relative;
   flex: 1;
   min-height: 0;
-  background: var(--navy-900);
+  background: var(--map-bg);
 }
 /* Doppelte Klasse: MapLibre lädt sein Stylesheet nach und setzt sonst position: relative */
 .map,
@@ -937,12 +962,12 @@ textarea.input {
   align-self: flex-start;
   min-height: var(--touch-min);
   padding: 0 var(--space-3);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  background: rgba(0, 0, 53, 0.55);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(24px) saturate(170%);
   backdrop-filter: blur(24px) saturate(170%);
-  color: var(--white);
+  color: var(--glass-text);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -950,7 +975,7 @@ textarea.input {
 .map-fallback {
   position: absolute;
   inset: 0;
-  background: var(--navy-900);
+  background: var(--map-bg);
 }
 /* Name der gewählten Kneipe über dem Pin */
 .mk-name {
@@ -1224,11 +1249,11 @@ textarea.input {
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(0, 0, 53, 0.55);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(24px) saturate(170%);
   backdrop-filter: blur(24px) saturate(170%);
-  color: var(--white);
+  color: var(--glass-text);
   font-size: 13px;
   line-height: 18px;
 }

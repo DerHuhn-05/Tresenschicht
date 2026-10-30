@@ -472,4 +472,6 @@ export const EN: Record<string, string> = {
   "Freund war hier": "friend was here",
   "Freunde waren hier": "friends were here",
   "Freunde, die hier waren": "Friends who have been here",
+  "Meldung des Geräts": "Message from your device",
+  "Dein iPhone findet gerade keinen Standort. Geh kurz ans Fenster oder vor die Tür.": "Your iPhone can't find a location right now. Step to a window or outside briefly.",
 };

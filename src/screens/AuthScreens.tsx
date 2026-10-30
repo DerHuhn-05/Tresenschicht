@@ -25,8 +25,11 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
     }
   }
 
-  const confirm = (mail: string) => {
+  // Passwort nur im Speicher: damit geht es nach dem Bestätigungslink ohne erneute Eingabe weiter
+  const [password, setPassword] = useState('');
+  const confirm = (mail: string, pw = '') => {
     setEmail(mail);
+    setPassword(pw);
     setView('confirm');
   };
   if (view === 'impressum') return <Impressum onBack={() => setView('welcome')} />;
@@ -34,7 +37,7 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
   if (view === 'register') return <Register onBack={() => setView('welcome')} onDone={onDone} onConfirm={confirm} />;
   if (view === 'login') return <Login onBack={() => setView('welcome')} onDone={(u) => onDone(u, false)} onReset={() => setView('reset')} onConfirm={confirm} />;
   if (view === 'reset') return <Reset onBack={() => setView('login')} onDone={(u) => onDone(u, false)} />;
-  if (view === 'confirm') return <ConfirmEmail email={email} onBack={() => setView('login')} onDone={(u) => onDone(u, true)} />;
+  if (view === 'confirm') return <ConfirmEmail email={email} password={password} onBack={() => setView('login')} onDone={(u) => onDone(u, true)} />;
 
   return (
     <div className="welcome">
@@ -68,7 +71,7 @@ export function AuthFlow({ onDone }: { onDone: (u: User, isNew: boolean) => void
 
 export const USERNAME = /^[A-Za-z0-9._]{3,24}$/;
 
-function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (u: User, isNew: boolean) => void; onConfirm: (email: string) => void }) {
+function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (u: User, isNew: boolean) => void; onConfirm: (email: string, password?: string) => void }) {
   const [privacy, setPrivacy] = useState(false);
   const [f, setF] = useState({ firstName: '', lastName: '', username: '', birthDate: '', city: '', email: '', password: '' });
   const [avatar, setAvatar] = useState<{ blob: Blob; url: string } | null>(null);
@@ -112,7 +115,7 @@ function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (
           setError(null);
           try {
             const r = await api.signUp({ ...f, username: f.username.trim(), email: f.email.trim(), avatar: avatar?.blob });
-            if (r.needsConfirmation) onConfirm(f.email.trim());
+            if (r.needsConfirmation) onConfirm(f.email.trim(), f.password);
             else onDone((await api.currentUser())!, true);
           } catch (err) {
             setError((err as Error).message);
@@ -161,7 +164,7 @@ function Register({ onBack, onDone, onConfirm }: { onBack: () => void; onDone: (
   );
 }
 
-function Login({ onBack, onDone, onReset, onConfirm }: { onBack: () => void; onDone: (u: User) => void; onReset: () => void; onConfirm: (email: string) => void }) {
+function Login({ onBack, onDone, onReset, onConfirm }: { onBack: () => void; onDone: (u: User) => void; onReset: () => void; onConfirm: (email: string, password?: string) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -197,7 +200,7 @@ function Login({ onBack, onDone, onReset, onConfirm }: { onBack: () => void; onD
               } catch {
                 /* Code eventuell schon unterwegs; trotzdem zur Eingabe */
               }
-              onConfirm(email.trim());
+              onConfirm(email.trim(), password);
             }}
           >
             {t('Code zum Bestätigen schicken')}
@@ -292,10 +295,30 @@ function CodeField({ value, onChange }: { value: string; onChange: (v: string) =
 }
 
 /** A3: E-Mail bestätigen mit Code, damit man in der Home-Bildschirm-App bleibt statt im Browser zu landen. */
-function ConfirmEmail({ email, onBack, onDone }: { email: string; onBack: () => void; onDone: (u: User) => void }) {
+function ConfirmEmail({ email, password, onBack, onDone }: { email: string; password: string; onBack: () => void; onDone: (u: User) => void }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Steht in der Mail nur ein Link (Standardvorlage von Supabase): Nach dem Antippen ist die Adresse bestätigt,
+  // die Anmeldung mit dem eben gewählten Passwort klappt dann. Beim Zurückkehren in die App still versuchen.
+  async function afterLink(silent: boolean) {
+    if (!password) return onBack(); // Passwort unbekannt: zur Anmeldung
+    if (!silent) setBusy(true);
+    try {
+      onDone(await api.signIn(email, password));
+    } catch (err) {
+      if (!silent) setError(/bestätige|confirm/i.test((err as Error).message) ? t('Die Adresse ist noch nicht bestätigt. Tipp zuerst den Link in der Mail an.') : (err as Error).message);
+    } finally {
+      if (!silent) setBusy(false);
+    }
+  }
+  useEffect(() => {
+    const onVis = () => !document.hidden && afterLink(true);
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, password]);
   const [wait, setWait] = useState(60);
   useEffect(() => {
     if (wait <= 0) return;
@@ -347,7 +370,14 @@ function ConfirmEmail({ email, onBack, onDone }: { email: string; onBack: () => 
         >
           {wait > 0 ? t('Neuen Code in {n} s anfordern', { n: wait }) : t('Neuen Code anfordern')}
         </button>
-        <p className="t-caption muted" style={{ marginTop: 16 }}>{t('Keine Mail? Schau im Spam-Ordner nach. Den Link in der Mail brauchst du nicht.')}</p>
+        <div className="card" style={{ marginTop: 24 }}>
+          <p className="t-body-strong">{t('In der Mail steht nur ein Link?')}</p>
+          <p className="t-secondary muted" style={{ marginTop: 4 }}>{t('Tipp ihn an, um die Adresse zu bestätigen. Komm danach hierher zurück.')}</p>
+          <button type="button" className="btn btn-secondary btn-block" style={{ marginTop: 12 }} disabled={busy} onClick={() => afterLink(false)}>
+            {password ? t('Ich habe bestätigt, weiter') : t('Ich habe bestätigt, zur Anmeldung')}
+          </button>
+        </div>
+        <p className="t-caption muted" style={{ marginTop: 16 }}>{t('Keine Mail? Schau im Spam-Ordner nach.')}</p>
       </form>
     </Page>
   );

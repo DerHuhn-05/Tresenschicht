@@ -482,4 +482,10 @@ export const EN: Record<string, string> = {
   "Code": "code",
   "Standort wird abgefragt …": "Requesting location …",
   "Standort jetzt testen": "Test location now",
+  "Die Adresse ist noch nicht bestätigt. Tipp zuerst den Link in der Mail an.": "Your address isn't confirmed yet. Tap the link in the email first.",
+  "In der Mail steht nur ein Link?": "Only a link in the email?",
+  "Tipp ihn an, um die Adresse zu bestätigen. Komm danach hierher zurück.": "Tap it to confirm your address, then come back here.",
+  "Ich habe bestätigt, weiter": "I've confirmed, continue",
+  "Ich habe bestätigt, zur Anmeldung": "I've confirmed, go to login",
+  "Keine Mail? Schau im Spam-Ordner nach.": "No email? Check your spam folder.",
 };

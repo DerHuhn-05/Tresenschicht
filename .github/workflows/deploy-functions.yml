@@ -14,6 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Zugangsdaten prüfen
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          URL: ${{ secrets.VITE_SUPABASE_URL }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error title=SUPABASE_ACCESS_TOKEN fehlt::In GitHub unter Settings → Secrets and variables → Actions das Secret SUPABASE_ACCESS_TOKEN anlegen (Supabase → Account preferences → Access Tokens), dann diese Aktion neu starten."
+            exit 1
+          fi
+          if [ -z "$URL" ]; then
+            echo "::error title=VITE_SUPABASE_URL fehlt::Das Secret VITE_SUPABASE_URL (Projekt-URL von Supabase) fehlt."
+            exit 1
+          fi
       - uses: supabase/setup-cli@v1
         with:
           version: latest

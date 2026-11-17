@@ -1473,3 +1473,5 @@ button.pub-stat { cursor: pointer; }
 .diag dl div { display: grid; grid-template-columns: 9em 1fr; gap: var(--space-2); font-size: 14px; line-height: 19px; }
 .diag dt { color: var(--text-muted); }
 .diag dd { margin: 0; word-break: break-word; }
+
+.steps { margin: var(--space-2) 0 0; padding-left: 1.3em; display: grid; gap: var(--space-2); font-size: 15px; line-height: 21px; }

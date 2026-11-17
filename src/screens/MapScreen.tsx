@@ -6,7 +6,7 @@ import { Notice, Sheet } from '../components/ui';
 import { PubMap, type PubMapHandle } from '../map/LazyMap';
 import { countdown, formatDistance, PUB_TYPE_LABEL } from '../lib/format';
 import { distanceM, zoomForRadius } from '../lib/geo';
-import { isDemo, useApp, useNow } from '../state/app';
+import { isDemo, standalone, useApp, useNow } from '../state/app';
 import { t } from '../lib/i18n';
 
 /** Umkreis beim Start der Karte */
@@ -171,7 +171,9 @@ export function MapScreen() {
         )}
         {location.status === 'denied' && !location.simulated && !hidden.has('denied') && (
           <Notice icon="location-off" onClose={hide('denied')}>
-            {t('Kein Standort. Öffne die Einstellungen und erlaube den Zugriff, während die App geöffnet ist.')}{' '}
+            {standalone
+              ? t('iOS lässt diese Home-Bildschirm-App nicht nach dem Standort fragen. Lösch die App vom Home-Bildschirm und füge sie über Safari neu hinzu.')
+              : t('Kein Standort. Öffne die Einstellungen und erlaube den Zugriff, während die App geöffnet ist.')}{' '}
             <button className="btn btn-text" style={{ minWidth: 0, padding: '0 4px' }} onClick={() => app.push({ kind: 'locationHelp' })}>
               {t('So geht’s')}
             </button>

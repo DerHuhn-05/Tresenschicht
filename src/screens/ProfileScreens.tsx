@@ -3,7 +3,7 @@ import { api, type CheckIn, type CollectionEntry, type PublicProfile } from '../
 import { Icon, type IconName } from '../components/Icon';
 import { Avatar, Confirm, Field, Notice, Page, PhotoPicker, Sheet, Spinner } from '../components/ui';
 import { remove } from '../lib/storage';
-import { isDemo, useApp } from '../state/app';
+import { isDemo, standalone, useApp } from '../state/app';
 import { BadgeGrid } from '../components/Badges';
 import { badgesOf } from '../lib/badges';
 import { StatsPanel, StatTile } from '../components/Stats';
@@ -315,6 +315,7 @@ function LocationTest() {
   const [busy, setBusy] = useState(false);
   function test() {
     if (!('geolocation' in navigator)) return setResult({ ok: false, text: t('Dieser Browser kann keinen Standort abfragen.') });
+    const started = Date.now();
     setBusy(true);
     setResult(null);
     navigator.geolocation.getCurrentPosition(
@@ -327,7 +328,10 @@ function LocationTest() {
         setBusy(false);
         const why =
           e.code === e.PERMISSION_DENIED
-            ? t('Abgelehnt: iOS oder Safari gibt den Standort für diese Seite nicht frei. Prüf die Schritte unten, vor allem Schritt 3.')
+            ? standalone && Date.now() - started < 1500
+              // sofort abgelehnt, ohne Frage: iOS hat sich für diese installierte App eine Ablehnung gemerkt
+              ? t('Sofort abgelehnt, ohne Nachfrage: iOS hat sich für diese Home-Bildschirm-App eine Ablehnung gemerkt. Lösch die App vom Home-Bildschirm, öffne die Seite in Safari und füge sie neu hinzu (Schritte oben).')
+              : t('Abgelehnt: iOS oder Safari gibt den Standort für diese Seite nicht frei. Prüf die Schritte unten, vor allem Schritt 3.')
             : e.code === e.TIMEOUT
               ? t('Zeit abgelaufen: kein Standort in 15 Sekunden. Geh kurz ans Fenster oder vor die Tür.')
               : t('Kein Signal: Das iPhone findet gerade keinen Standort.');
@@ -436,6 +440,17 @@ export function LocationHelp() {
           <p className="muted t-secondary">
             {t('Dein iPhone fragt gleich, ob Tresenschicht deinen Standort verwenden darf. Wähle „Erlauben“. Auf dem iPhone fragt eine Web-App bei jedem Öffnen neu, das ist eine Vorgabe von iOS.')}
           </p>
+        )}
+        {standalone && (
+          <div className="card">
+            <p className="t-body-strong">{t('Fragt iOS hier nicht nach dem Standort?')}</p>
+            <ol className="steps">
+              <li>{t('Diese App vom Home-Bildschirm löschen (Symbol gedrückt halten → App entfernen).')}</li>
+              <li>{t('In Safari {url} öffnen und dort einmal den Standort erlauben.', { url: location.host + location.pathname })}</li>
+              <li>{t('Teilen → „Zum Home-Bildschirm“ und die App von dort neu öffnen.')}</li>
+              <li>{t('Auf der Karte „Standort erlauben“ antippen und „Beim Verwenden der App erlauben“ wählen.')}</li>
+            </ol>
+          </div>
         )}
         <LocationTest />
         <LocationDiagnostics />

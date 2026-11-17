@@ -86,6 +86,9 @@ const isDemo = api.mode === 'demo';
 /** Gesetzt, sobald die App einmal nach dem Standort gefragt hat (Onboarding erledigt). */
 export const LOCATION_ASKED = 'kneipen-location-asked';
 
+/** Home-Bildschirm-App (iOS): hat eigene Freigaben, getrennt von Safari */
+export const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches;
+
 export function AppProvider({ children, initialUser }: { children: ReactNode; initialUser: User | null }) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [tab, setTabState] = useState<Tab>('map');
@@ -124,8 +127,6 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
     giveUp.current = null;
   }, []);
 
-  /** Home-Bildschirm-App (iOS): hat eigene Freigaben, getrennt von Safari */
-  const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches;
 
   // gesture: vom Antippen ausgelöst. iOS lehnt in der Home-Bildschirm-App Abfragen ohne Antippen oft still ab;
   // eine solche Ablehnung gilt nicht als endgültig, die App bittet dann ums Antippen.
@@ -162,7 +163,7 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
     watchId.current = navigator.geolocation.watchPosition(ok(false), fail, { enableHighAccuracy: true, maximumAge: 10_000, timeout: 30_000 });
     // Nach 45 Sekunden ohne Standort einen Hinweis zeigen; die Abfrage läuft trotzdem weiter
     giveUp.current = setTimeout(() => setLocation((l) => (l.status === 'asking' ? { ...l, status: 'unavailable' } : l)), 45_000);
-  }, [stopWatch, standalone]);
+  }, [stopWatch]);
 
   const requestLocation = useCallback(() => {
     if (location.simulated) {

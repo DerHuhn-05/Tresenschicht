@@ -530,4 +530,11 @@ export const EN: Record<string, string> = {
   "Freigabe laut Gerät": "Permission (device)",
   "Letzter Standort": "Last location",
   "Technische Angaben": "Technical details",
+  "iOS lässt diese Home-Bildschirm-App nicht nach dem Standort fragen. Lösch die App vom Home-Bildschirm und füge sie über Safari neu hinzu.": "iOS doesn't let this Home Screen app ask for your location. Delete the app from your Home Screen and add it again via Safari.",
+  "Sofort abgelehnt, ohne Nachfrage: iOS hat sich für diese Home-Bildschirm-App eine Ablehnung gemerkt. Lösch die App vom Home-Bildschirm, öffne die Seite in Safari und füge sie neu hinzu (Schritte oben).": "Denied instantly, without asking: iOS has remembered a denial for this Home Screen app. Delete the app from your Home Screen, open the page in Safari and add it again (steps above).",
+  "Fragt iOS hier nicht nach dem Standort?": "iOS doesn't ask for your location here?",
+  "Diese App vom Home-Bildschirm löschen (Symbol gedrückt halten → App entfernen).": "Delete this app from your Home Screen (press and hold the icon → Remove App).",
+  "In Safari {url} öffnen und dort einmal den Standort erlauben.": "Open {url} in Safari and allow location there once.",
+  "Teilen → „Zum Home-Bildschirm“ und die App von dort neu öffnen.": "Share → “Add to Home Screen”, then open the app from there.",
+  "Auf der Karte „Standort erlauben“ antippen und „Beim Verwenden der App erlauben“ wählen.": "On the map, tap “Allow location” and choose “Allow While Using App”.",
 };

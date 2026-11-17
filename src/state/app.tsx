@@ -36,6 +36,8 @@ export interface LocationState {
   fix: number;
   /** Letzte Fehlermeldung des Geräts (für die Hilfe-Seite) */
   error?: string;
+  /** Zeitpunkt des letzten Standorts (für die Hilfe-Seite) */
+  at?: number;
 }
 
 interface Toast {
@@ -141,7 +143,7 @@ export function AppProvider({ children, initialUser }: { children: ReactNode; in
         // ein grober Standort ersetzt nie einen genauen
         coarse && l.status === 'ok' && !l.simulated && (l.accuracy ?? Infinity) <= p.coords.accuracy
           ? l
-          : { status: 'ok', simulated: false, pos: { lat: p.coords.latitude, lon: p.coords.longitude }, accuracy: p.coords.accuracy, fix: l.fix + 1 }
+          : { status: 'ok', simulated: false, pos: { lat: p.coords.latitude, lon: p.coords.longitude }, accuracy: p.coords.accuracy, fix: l.fix + 1, at: Date.now() }
       );
     };
     const fail = (err: GeolocationPositionError) =>

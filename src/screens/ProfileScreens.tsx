@@ -7,6 +7,7 @@ import { isDemo, useApp } from '../state/app';
 import { BadgeGrid } from '../components/Badges';
 import { badgesOf } from '../lib/badges';
 import { StatsPanel, StatTile } from '../components/Stats';
+import { relativeTime } from '../lib/format';
 import { USERNAME } from './AuthScreens';
 import { VisitCard } from './CollectionScreens';
 import { LANG, plural, setLang, t, type Lang } from '../lib/i18n';
@@ -276,6 +277,38 @@ export function PrivacyScreen() {
 }
 
 /** Standort direkt beim Tippen abfragen (iOS verlangt dafür teils eine Berührung) und das Ergebnis zeigen */
+/** Technische Angaben zur Fehlersuche (Screenshot genügt) */
+function LocationDiagnostics() {
+  const app = useApp();
+  const [perm, setPerm] = useState('…');
+  useEffect(() => {
+    if (!navigator.permissions?.query) return setPerm(t('nicht abfragbar'));
+    navigator.permissions.query({ name: 'geolocation' }).then((p) => setPerm(p.state)).catch(() => setPerm(t('nicht abfragbar')));
+  }, [app.location.fix, app.location.status]);
+  const l = app.location;
+  const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches;
+  const ios = /OS (\d+[_\d]*) like Mac OS X/.exec(navigator.userAgent)?.[1]?.replace(/_/g, '.');
+  const rows: [string, string][] = [
+    [t('Ansicht'), standalone ? t('Home-Bildschirm-App') : t('Browser')],
+    [t('Status in der App'), l.simulated ? 'simuliert' : l.status],
+    [t('Freigabe laut Gerät'), perm],
+    [t('Letzter Standort'), l.at ? `${relativeTime(new Date(l.at).toISOString())}, ± ${Math.round(l.accuracy ?? 0)} m` : '–'],
+    [t('Meldung des Geräts'), l.error ?? '–'],
+    ['iOS', ios ?? '–'],
+    [t('Adresse'), location.origin + location.pathname],
+  ];
+  return (
+    <details className="diag">
+      <summary>{t('Technische Angaben')}</summary>
+      <dl>
+        {rows.map(([k, v]) => (
+          <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
 function LocationTest() {
   const app = useApp();
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
@@ -405,6 +438,7 @@ export function LocationHelp() {
           </p>
         )}
         <LocationTest />
+        <LocationDiagnostics />
         {app.location.error && s !== 'ok' && (
           <p className="t-caption muted">{t('Meldung des Geräts')}: {app.location.error}</p>
         )}

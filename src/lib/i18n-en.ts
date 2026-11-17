@@ -523,4 +523,11 @@ export const EN: Record<string, string> = {
   "Mitteilungen, {n} neu": "Notifications, {n} new",
   "Push und was du mitbekommst": "Push and what you hear about",
   "Mitteilungen sind auf dem Server noch nicht eingerichtet.": "Notifications aren't set up on the server yet.",
+  "nicht abfragbar": "not available",
+  "Home-Bildschirm-App": "Home Screen app",
+  "Browser": "Browser",
+  "Status in der App": "Status in the app",
+  "Freigabe laut Gerät": "Permission (device)",
+  "Letzter Standort": "Last location",
+  "Technische Angaben": "Technical details",
 };

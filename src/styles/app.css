@@ -1465,3 +1465,11 @@ button.pub-stat { cursor: pointer; }
   background: var(--accent);
 }
 .list-row:disabled { cursor: default; opacity: 1; }
+
+/* Technische Angaben auf der Standort-Hilfe */
+.diag { border-radius: var(--radius-md); border: var(--stroke-hairline) solid var(--border-subtle); background: var(--surface); }
+.diag summary { min-height: 44px; display: flex; align-items: center; padding: 0 var(--space-4); font-weight: 600; cursor: pointer; }
+.diag dl { margin: 0; padding: 0 var(--space-4) var(--space-3); display: grid; gap: var(--space-2); }
+.diag dl div { display: grid; grid-template-columns: 9em 1fr; gap: var(--space-2); font-size: 14px; line-height: 19px; }
+.diag dt { color: var(--text-muted); }
+.diag dd { margin: 0; word-break: break-word; }
